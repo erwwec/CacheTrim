@@ -1,0 +1,6 @@
+dist/CacheTrim.exe
+dist/CacheTrim.exe.sha256
+*.user
+*.suo
+*.log
+*.previous
