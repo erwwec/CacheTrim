@@ -17,12 +17,12 @@ namespace CacheTrim
         public static readonly Color Text = Color.FromArgb(237, 242, 248);
         public static readonly Color Muted = Color.FromArgb(145, 158, 174);
         public static readonly Color Faint = Color.FromArgb(94, 108, 125);
-        public static readonly Color Accent = Color.FromArgb(91, 226, 158);
-        public static readonly Color AccentSoft = Color.FromArgb(25, 66, 50);
+        public static readonly Color Accent = Color.FromArgb(139, 140, 255);
+        public static readonly Color AccentSoft = Color.FromArgb(39, 39, 76);
         public static readonly Color Red = Color.FromArgb(226, 88, 74);
         public static readonly Color Amber = Color.FromArgb(240, 180, 41);
-        public static readonly Color Blue = Color.FromArgb(74, 163, 224);
-        public static readonly Color Violet = Color.FromArgb(150, 128, 240);
+        public static readonly Color Blue = Color.FromArgb(83, 177, 255);
+        public static readonly Color Violet = Color.FromArgb(190, 139, 255);
 
         public static Font H1
         {

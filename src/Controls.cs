@@ -79,7 +79,7 @@ namespace CacheTrim
                 fill = _down ? Theme.Blend(Theme.Accent, Color.Black, 0.18)
                     : (_hover ? Theme.Blend(Theme.Accent, Color.White, 0.08) : Theme.Accent);
                 border = Theme.Blend(fill, Color.White, 0.12);
-                text = Color.FromArgb(8, 18, 12);
+                text = Color.FromArgb(13, 14, 27);
             }
             else
             {
@@ -158,7 +158,7 @@ namespace CacheTrim
             int x = Checked ? track.Right - d - 3 : track.X + 3;
             Rectangle knob = new Rectangle(x, track.Y + 3, d, d);
 
-            using (SolidBrush b = new SolidBrush(Checked ? Color.FromArgb(9, 20, 14) : Color.FromArgb(154, 166, 180)))
+            using (SolidBrush b = new SolidBrush(Checked ? Color.FromArgb(13, 14, 27) : Color.FromArgb(154, 166, 180)))
                 g.FillEllipse(b, knob);
         }
     }
@@ -220,7 +220,7 @@ namespace CacheTrim
 
             if (Checked)
             {
-                using (Pen p = new Pen(Color.FromArgb(9, 20, 14), 1.8f))
+                using (Pen p = new Pen(Color.FromArgb(13, 14, 27), 1.8f))
                 {
                     p.StartCap = LineCap.Round;
                     p.EndCap = LineCap.Round;
