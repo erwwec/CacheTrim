@@ -1176,6 +1176,7 @@ public partial class MainWindow : Window
             if (!info.Available) { MessageBox.Show(this, "Установлена последняя версия CacheTrim " + AppInfo.Version + ".", "Обновлений нет", MessageBoxButton.OK, MessageBoxImage.Information); SetStatus("установлена последняя версия"); return; }
             if (Confirm("Доступно обновление " + info.Version, "Скачать проверенную SHA-256 сборку и перезапустить CacheTrim?"))
             {
+                SetStatus("скачиваю и проверяю обновление " + info.Version + "…");
                 string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
                 await Task.Run(() => UpdateService.DownloadAndLaunch(info, exe, Environment.ProcessId));
                 System.Windows.Application.Current.Shutdown();

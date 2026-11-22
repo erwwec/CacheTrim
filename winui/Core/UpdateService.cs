@@ -31,6 +31,7 @@ internal static class UpdateService
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, AppInfo.GitHubReleaseApi);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
         using HttpResponseMessage response = Client.Send(request);
         response.EnsureSuccessStatusCode();
         using JsonDocument document = JsonDocument.Parse(response.Content.ReadAsStream());
@@ -69,6 +70,8 @@ internal static class UpdateService
     {
         if (update is null || !update.Available)
             throw new InvalidOperationException("Нет доступного обновления.");
+        if (string.IsNullOrWhiteSpace(targetExe) || !File.Exists(targetExe))
+            throw new FileNotFoundException("Не удалось определить файл CacheTrim, который нужно обновить.", targetExe);
         RequireGitHubUrl(update.DownloadUrl);
         RequireGitHubUrl(update.ChecksumUrl);
 
@@ -132,17 +135,31 @@ internal static class UpdateService
 
         File.WriteAllText(checksumFile, actual, Encoding.ASCII);
         string scriptPath = Path.Combine(updateRoot, "ApplyUpdate.ps1");
+        string logPath = Path.Combine(updateRoot, "ApplyUpdate.log");
         StringBuilder script = new();
+        script.AppendLine("$ErrorActionPreference = 'Stop'");
         script.AppendLine("$processId = " + processId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         script.AppendLine("$source = " + PowerShellLiteral(stagedExe));
         script.AppendLine("$target = " + PowerShellLiteral(targetExe));
-        script.AppendLine("Wait-Process -Id $processId -ErrorAction SilentlyContinue");
-        script.AppendLine("Start-Sleep -Milliseconds 800");
+        script.AppendLine("$log = " + PowerShellLiteral(logPath));
+        script.AppendLine("$expectedHash = " + PowerShellLiteral(actual));
+        script.AppendLine("try {");
+        script.AppendLine("  Set-Content -LiteralPath $log -Value ('Starting update ' + (Get-Date -Format o)) -Encoding UTF8");
+        script.AppendLine("  Wait-Process -Id $processId -ErrorAction SilentlyContinue");
         script.AppendLine("$backup = $target + '.previous'");
-        script.AppendLine("if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination $backup -Force }");
+        script.AppendLine("  if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination $backup -Force }");
         script.AppendLine("$installed = $false");
-        script.AppendLine("for ($i = 0; $i -lt 12; $i++) { try { [System.IO.File]::Copy($source, $target, $true); $installed = $true; break } catch { Start-Sleep -Seconds 1 } }");
-        script.AppendLine("if ($installed) { Start-Process -FilePath $target } elseif (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; Start-Process -FilePath $target }");
+        script.AppendLine("  for ($i = 0; $i -lt 20; $i++) { try { [System.IO.File]::Copy($source, $target, $true); $installed = $true; break } catch { Start-Sleep -Seconds 1 } }");
+        script.AppendLine("  if (-not $installed) { throw 'Windows не разрешила заменить CacheTrim.exe.' }");
+        script.AppendLine("  $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()");
+        script.AppendLine("  if ($actualHash -ne $expectedHash) { throw 'Проверка установленного файла не прошла.' }");
+        script.AppendLine("  Add-Content -LiteralPath $log -Value 'Update installed and verified.' -Encoding UTF8");
+        script.AppendLine("  Start-Process -FilePath $target");
+        script.AppendLine("} catch {");
+        script.AppendLine("  Add-Content -LiteralPath $log -Value ('UPDATE FAILED: ' + $_.Exception.Message) -Encoding UTF8");
+        script.AppendLine("  if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; Start-Process -FilePath $target }");
+        script.AppendLine("  try { (New-Object -ComObject WScript.Shell).Popup('Не удалось установить обновление CacheTrim. Старая версия сохранена. Подробности: ' + $log, 0, 'CacheTrim — обновление', 48) | Out-Null } catch { }");
+        script.AppendLine("}");
         File.WriteAllText(scriptPath, script.ToString(), Encoding.Unicode);
 
         string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell\\v1.0\\powershell.exe");
