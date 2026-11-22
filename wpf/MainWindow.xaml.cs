@@ -54,11 +54,15 @@ public partial class MainWindow : Window
     private Rect _windowRestoreBounds;
     private bool _coversTaskbar;
     private int _lastBackdropResult = int.MinValue;
+    private bool _pageResizeQueued;
+    private bool _preservePageScroll;
+    private double _lastPageViewportWidth;
 
     public MainWindow(int startPage = 0)
     {
         InitializeComponent();
-        PageScroll.SizeChanged += delegate { ResizeDashboardChart(); };
+        BrandVersion.Text = "SYSTEM TOOLS · " + AppInfo.Version;
+        PageScroll.SizeChanged += OnPageViewportSizeChanged;
         _settings = App.Settings;
         Theme.Apply(_settings.ThemeName, _settings.AccentColorHex);
         ApplyTheme();
@@ -201,6 +205,45 @@ public partial class MainWindow : Window
         _memoryUsed = _memoryStandby = _memoryCache = _memoryCommit = _memoryPercent = null;
         _logBox = null;
         PageHost.Content = stack;
+        if (!_preservePageScroll)
+            Dispatcher.BeginInvoke(new Action(() => PageScroll.ScrollToTop()), DispatcherPriority.Loaded);
+    }
+
+    private void OnPageViewportSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ResizeDashboardChart();
+        double width = PageScroll.ViewportWidth;
+        if (width < 1 || _pageResizeQueued || _busy || Keyboard.FocusedElement is TextBox)
+            return;
+        if (_lastPageViewportWidth > 0 && Math.Abs(width - _lastPageViewportWidth) < 24)
+            return;
+
+        if (_activePage != "clean" && _activePage != "optimize" && _activePage != "advanced" && _activePage != "settings")
+        {
+            _lastPageViewportWidth = width;
+            return;
+        }
+
+        _lastPageViewportWidth = width;
+        _pageResizeQueued = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _pageResizeQueued = false;
+            if (_busy || Keyboard.FocusedElement is TextBox)
+                return;
+
+            double offset = PageScroll.VerticalOffset;
+            _preservePageScroll = true;
+            switch (_activePage)
+            {
+                case "clean": ShowClean(); break;
+                case "optimize": ShowOptimize(); break;
+                case "advanced": ShowAdvanced(); break;
+                case "settings": ShowSettings(); break;
+            }
+            _preservePageScroll = false;
+            Dispatcher.BeginInvoke(new Action(() => PageScroll.ScrollToVerticalOffset(offset)), DispatcherPriority.Loaded);
+        }), DispatcherPriority.Loaded);
     }
 
     private Border Card(string title, UIElement content)
@@ -285,6 +328,21 @@ public partial class MainWindow : Window
     }
 
     private void SetStatus(string text) => StatusText.Text = text;
+
+    private bool SaveConfig(Config config, string successStatus, string logMessage)
+    {
+        string error = config.Save();
+        if (error != null)
+        {
+            SetStatus("не удалось сохранить настройки");
+            MessageBox.Show(this, error, "Не удалось сохранить настройки CacheTrim", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        App.Log(logMessage);
+        SetStatus(successStatus);
+        return true;
+    }
 
     private async Task RunBusyAsync(string label, Func<Task> action)
     {
@@ -535,11 +593,6 @@ public partial class MainWindow : Window
         {
             await Task.Run(() =>
             {
-                if (c.WorkingSets) LogPurge(Native.Purge(Native.PurgeTarget.WorkingSets), "рабочие наборы");
-                if (c.Modified) LogPurge(Native.Purge(Native.PurgeTarget.ModifiedList), "изменённые страницы");
-                if (c.Standby) LogPurge(Native.Purge(Native.PurgeTarget.StandbyList), "standby-список");
-                if (c.LowStandby) LogPurge(Native.Purge(Native.PurgeTarget.LowPriorityStandby), "низкоприоритетный standby");
-                if (c.FileCache) LogPurge(Native.FlushSystemFileCache(), "системный кэш файлов");
                 Cleaner cleaner = new(App.Log); cleaner.Run(c);
                 App.Log("полный прогон завершён · удалено " + Cleaner.FormatBytes(cleaner.BytesFreed) + " · пропущено " + cleaner.FilesSkipped);
             });
@@ -599,7 +652,7 @@ public partial class MainWindow : Window
             Opt("Корзина", "Очищает корзину Windows.", () => c.Recycle, v => c.Recycle = v)
         });
         WrapPanel actions = new();
-        actions.Children.Add(Action("Сохранить настройки", () => { c.Save(); App.Log("настройки очистки сохранены"); SetStatus("настройки сохранены"); }, true));
+        actions.Children.Add(Action("Сохранить настройки", () => SaveConfig(c, "настройки сохранены", "настройки очистки сохранены"), true));
         actions.Children.Add(Action("Запустить очистку", async () => await RunCleanerAsync(c.Clone())));
         _cleanLeftColumn = null;
         _cleanRightColumn = null;
@@ -740,15 +793,15 @@ public partial class MainWindow : Window
             AdvancedButton("Восстановить компоненты Windows", async () => await RestoreWindowsImageAsync(), true)));
 
         modules.Children.Add(AdvancedModule("ОЧИСТИТЬ СИСТЕМНЫЕ КОМПОНЕНТЫ", "Удаляет устаревшие версии компонентов Windows после обновлений. После очистки нельзя будет удалить соответствующие старые обновления.",
-            AdvancedAction("Удалить старые компоненты", "DISM удалит заменённые версии системных компонентов, чтобы освободить место. После этого нельзя будет удалить соответствующие старые обновления Windows. Операция может занять много времени.", "Очищаются старые компоненты Windows…", "Dism.exe", "/Online /Cleanup-Image /StartComponentCleanup")));
+            AdvancedAction("Удалить старые компоненты", "DISM удалит заменённые версии системных компонентов, чтобы освободить место. После этого нельзя будет удалить соответствующие старые обновления Windows. Операция может занять много времени.", "Очищаются старые компоненты Windows…", "Dism.exe", "/Online /Cleanup-Image /StartComponentCleanup", 2 * 60 * 60 * 1000)));
 
         modules.Children.Add(AdvancedModule("ПРОИЗВОДИТЕЛЬНОСТЬ WINDOWS", "Высокая производительность уменьшает энергосбережение процессора. На ноутбуке быстрее расходуется заряд. Вернуть обычный режим можно этой же карточкой.",
             AdvancedButton("Включить высокую производительность", async () => await ApplyPowerPlanAsync(true), true),
             AdvancedButton("Вернуть сбалансированный режим", async () => await ApplyPowerPlanAsync(false))));
 
         WrapPanel checks = new();
-        checks.Children.Add(AdvancedAction("Проверить файлы Windows", "Проверит защищённые файлы и попробует восстановить повреждённые. Может занять несколько минут.", "Проверяются файлы Windows…", "sfc.exe", "/scannow"));
-        checks.Children.Add(AdvancedAction("Проверить диск C:", "Проверит файловую систему диска C: без отключения тома. Исправление ошибок не запускается.", "Проверяется диск C:…", "chkdsk.exe", "C: /scan"));
+        checks.Children.Add(AdvancedAction("Проверить файлы Windows", "Проверит защищённые файлы и попробует восстановить повреждённые. Может занять несколько минут.", "Проверяются файлы Windows…", "sfc.exe", "/scannow", 30 * 60 * 1000));
+        checks.Children.Add(AdvancedAction("Проверить диск C:", "Проверит файловую систему диска C: без отключения тома. Исправление ошибок не запускается.", "Проверяется диск C:…", "chkdsk.exe", "C: /scan", 60 * 60 * 1000));
         checks.Children.Add(Action("Монитор ресурсов", () => OpenSystemTool("resmon.exe")));
         checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
         modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
@@ -818,7 +871,7 @@ public partial class MainWindow : Window
         {
             string ps = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe");
             string output = string.Empty;
-            int code = await Task.Run(() => Tweaks.Run(ps, "-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description 'CacheTrim before changes' -RestorePointType 'MODIFY_SETTINGS'\"", out output));
+            int code = await Task.Run(() => Tweaks.Run(ps, "-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description 'CacheTrim before changes' -RestorePointType 'MODIFY_SETTINGS'\"", out output, 10 * 60 * 1000));
             App.Log("точка восстановления · код " + code + " · " + output);
             MessageBox.Show(this, code == 0 ? "Точка восстановления создана." : "Windows не создала точку восстановления. Проверьте, включена ли защита системы.\n\n" + output, "Точка восстановления", MessageBoxButton.OK, code == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         });
@@ -864,21 +917,21 @@ public partial class MainWindow : Window
         });
     }
 
-    private Wpf.Ui.Controls.Button AdvancedAction(string label, string warning, string busy, string executable, string arguments)
+    private Wpf.Ui.Controls.Button AdvancedAction(string label, string warning, string busy, string executable, string arguments, int timeoutMilliseconds = 30000)
     {
-        Wpf.Ui.Controls.Button button = Action(label, async () => await RunAdvancedCommandAsync(label, warning, busy, executable, arguments));
+        Wpf.Ui.Controls.Button button = Action(label, async () => await RunAdvancedCommandAsync(label, warning, busy, executable, arguments, timeoutMilliseconds));
         button.ToolTip = warning;
         return button;
     }
 
-    private async Task RunAdvancedCommandAsync(string title, string warning, string busy, string executable, string arguments)
+    private async Task RunAdvancedCommandAsync(string title, string warning, string busy, string executable, string arguments, int timeoutMilliseconds)
     {
         if (!ConfirmRisk(title, warning)) return;
         await RunBusyAsync(busy, async () =>
         {
             string output = string.Empty;
             string path = System.IO.Path.Combine(Environment.SystemDirectory, executable);
-            int code = await Task.Run(() => Tweaks.Run(path, arguments, out output));
+            int code = await Task.Run(() => Tweaks.Run(path, arguments, out output, timeoutMilliseconds));
             App.Log(title + " · код " + code + " · " + output);
             MessageBox.Show(this, "Код завершения: " + code + "\nПодробности записаны в журнал CacheTrim.", title + (code == 0 ? " — готово" : " — завершено с сообщением"), MessageBoxButton.OK, code == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         });
@@ -893,7 +946,7 @@ public partial class MainWindow : Window
         {
             Directory.CreateDirectory(Config.LogDir);
             string output = string.Empty;
-            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\powercfg.exe", "/energy /duration 30 /output \"" + reportPath + "\"", out output));
+            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\powercfg.exe", "/energy /duration 30 /output \"" + reportPath + "\"", out output, 2 * 60 * 1000));
             App.Log("отчёт о питании · код " + code + " · " + output);
             if (code == 0 && File.Exists(reportPath)) OpenPath(reportPath);
             else MessageBox.Show(this, "Не удалось создать отчёт. Код завершения: " + code + "\n" + output, "Отчёт об энергопотреблении", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -917,7 +970,7 @@ public partial class MainWindow : Window
         await RunBusyAsync("восстанавливаются компоненты Windows…", async () =>
         {
             string output = string.Empty;
-            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\Dism.exe", "/Online /Cleanup-Image /RestoreHealth", out output));
+            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\Dism.exe", "/Online /Cleanup-Image /RestoreHealth", out output, 2 * 60 * 60 * 1000));
             App.Log("DISM RestoreHealth · код " + code + " · " + output);
             MessageBox.Show(this, "Код завершения: " + code + "\nПодробности записаны в журнал CacheTrim.", "Восстановление Windows завершено", MessageBoxButton.OK, code == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         });
@@ -937,7 +990,7 @@ public partial class MainWindow : Window
             foreach (DriveInfo drive in DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed))
             {
                 string output = string.Empty;
-                int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\defrag.exe", "\"" + drive.Name.TrimEnd('\\') + "\" /O", out output));
+                int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\defrag.exe", "\"" + drive.Name.TrimEnd('\\') + "\" /O", out output, 2 * 60 * 60 * 1000));
                 App.Log("обслуживание диска " + drive.Name + " · код " + code + " · " + output);
             }
         });
@@ -949,7 +1002,7 @@ public partial class MainWindow : Window
         await RunBusyAsync("проверяются системные файлы…", async () =>
         {
             string output = string.Empty;
-            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\sfc.exe", "/scannow", out output));
+            int code = await Task.Run(() => Tweaks.Run(Environment.SystemDirectory + "\\sfc.exe", "/scannow", out output, 30 * 60 * 1000));
             App.Log("SFC завершён · код " + code + " · " + output);
             MessageBox.Show(this, "Код завершения: " + code + "\nПодробности записаны в журнал.", "Проверка системных файлов", MessageBoxButton.OK, MessageBoxImage.Information);
         });
@@ -976,7 +1029,8 @@ public partial class MainWindow : Window
             CheckBox check = new() { IsChecked = entry.Enabled, VerticalAlignment = VerticalAlignment.Center };
             check.Checked += async (_, _) => await SetAutostartAsync(entry, check, true);
             check.Unchecked += async (_, _) => await SetAutostartAsync(entry, check, false);
-            rows.Children.Add(Row(entry.Name, Autostart.SourceLabel(entry.Origin) + " · " + Ellipsize(entry.Command, 110) + (entry.RequiresAdmin ? " · админ" : string.Empty), check));
+            string state = entry.Enabled ? string.Empty : " · отключено, запись в резерве";
+            rows.Children.Add(Row(entry.Name, Autostart.SourceLabel(entry.Origin) + " · " + Ellipsize(entry.Command, 110) + state + (entry.RequiresAdmin ? " · админ" : string.Empty), check));
         }
         _pageContent!.Children.Add(Card("ЗАПИСИ АВТОЗАПУСКА · " + entries.Count, rows));
         WrapPanel taskActions = new();
@@ -1031,8 +1085,7 @@ public partial class MainWindow : Window
         densityMode.SelectionChanged += (_, _) =>
         {
             _settings.UiDensity = densityMode.SelectedIndex;
-            _settings.Save();
-            SetStatus("плотность интерфейса сохранена");
+            SaveConfig(_settings, "плотность интерфейса сохранена", "плотность интерфейса изменена");
             ShowSettings();
         };
         appearance.Children.Add(Row("Плотность интерфейса", "Компактно — больше строк на экране; свободно — крупнее отступы.", densityMode));
@@ -1079,7 +1132,7 @@ public partial class MainWindow : Window
         appearance.Children.Add(Row("Цвет акцента и стекла", "Выбери свой цвет, он меняет оттенок стеклянной поверхности.", colorActions));
         appearance.Children.Add(new TextBlock { Text = "Текущий цвет: " + (_settings.AccentColorHex.Length > 0 ? _settings.AccentColorHex : Theme.DefaultAccentHex(_settings.ThemeName)), FontSize = 11, Foreground = Brush(Theme.Muted), Margin = new Thickness(2, 0, 0, 8) });
         WrapPanel appearanceActions = new();
-        appearanceActions.Children.Add(Action("Сохранить оформление", () => { _settings.Save(); SetStatus("оформление сохранено"); App.Log("оформление сохранено"); }, true));
+        appearanceActions.Children.Add(Action("Сохранить оформление", () => SaveConfig(_settings, "оформление сохранено", "оформление сохранено"), true));
         appearanceActions.Children.Add(Action("Сбросить цвет", () => { _settings.AccentColorHex = string.Empty; Theme.Apply(_settings.ThemeName, string.Empty); ApplyTheme(); ShowSettings(); }));
         appearance.Children.Add(appearanceActions);
         Border appearanceCard = Card("ОФОРМЛЕНИЕ", appearance); appearanceCard.Width = settingsCardWidth; appearanceCard.Margin = new Thickness(0, 0, 16, 16); cards.Children.Add(appearanceCard);
@@ -1093,7 +1146,7 @@ public partial class MainWindow : Window
         {
             if (int.TryParse(delay.Text, out int d)) _settings.DelaySeconds = Math.Clamp(d, 0, 600);
             if (int.TryParse(age.Text, out int a)) _settings.TempAgeHours = Math.Clamp(a, 0, 8760);
-            _settings.Save(); App.Log("параметры очистки сохранены"); SetStatus("параметры сохранены");
+            SaveConfig(_settings, "параметры сохранены", "параметры очистки сохранены");
         }, true));
         Border behaviorCard = Card("ПОВЕДЕНИЕ ОЧИСТКИ", behavior); behaviorCard.Width = settingsCardWidth; behaviorCard.Margin = new Thickness(0, 0, 0, 16); cards.Children.Add(behaviorCard);
 

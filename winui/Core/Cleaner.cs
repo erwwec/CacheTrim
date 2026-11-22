@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.ServiceProcess;
-using System.Threading;
 
 namespace CacheTrim
 {
@@ -219,18 +217,23 @@ namespace CacheTrim
             string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
 
             // Only the download queues are touched, never the component store.
-            bool stopped = StopService("wuauserv") && StopService("bits");
-            if (!stopped)
-                _log("  службы обновления заняты, удалится только незанятое");
-
-            Sweep(Path.Combine(windir, @"SoftwareDistribution\Download"), null, "*");
-            Sweep(Path.Combine(programData, @"Microsoft\Network\Downloader"), null, "*");
-            Sweep(Path.Combine(windir, @"SoftwareDistribution\DeliveryOptimization"), null, "*");
-
-            if (stopped)
+            bool restartWua;
+            bool restartBits;
+            bool wuaStopped = StopService("wuauserv", out restartWua);
+            bool bitsStopped = StopService("bits", out restartBits);
+            try
             {
-                StartService("wuauserv");
-                StartService("bits");
+                if (!wuaStopped || !bitsStopped)
+                    _log("  службы обновления заняты, удалятся только незанятые файлы");
+
+                Sweep(Path.Combine(windir, @"SoftwareDistribution\Download"), null, "*");
+                Sweep(Path.Combine(programData, @"Microsoft\Network\Downloader"), null, "*");
+                Sweep(Path.Combine(windir, @"SoftwareDistribution\DeliveryOptimization"), null, "*");
+            }
+            finally
+            {
+                if (restartWua) StartService("wuauserv");
+                if (restartBits) StartService("bits");
             }
 
             _log("  " + FormatBytes(_bytes - before));
@@ -246,14 +249,14 @@ namespace CacheTrim
             if (c.Arp)
             {
                 string output;
-                int code = RunTool("netsh.exe", "interface ip delete arpcache", out output);
+                int code = RunTool(Path.Combine(Environment.SystemDirectory, "netsh.exe"), "interface ip delete arpcache", out output);
                 _log(code == 0 ? "  arp: сброшен" : "  arp: код " + code);
             }
 
             if (c.Netbios)
             {
                 string output;
-                int code = RunTool("nbtstat.exe", "-R", out output);
+                int code = RunTool(Path.Combine(Environment.SystemDirectory, "nbtstat.exe"), "-R", out output);
                 _log(code == 0 ? "  netbios: сброшен" : "  netbios: код " + code);
             }
         }
@@ -294,6 +297,19 @@ namespace CacheTrim
         {
             if (!Directory.Exists(root))
                 return;
+
+            try
+            {
+                if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+                {
+                    _log("  пропущена ссылка на каталог: " + root);
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                return;
+            }
 
             Stack<string> stack = new Stack<string>();
             List<string> dirs = new List<string>();
@@ -349,7 +365,21 @@ namespace CacheTrim
                 }
 
                 foreach (string sub in subdirs)
-                    stack.Push(sub);
+                {
+                    try
+                    {
+                        if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
+                        {
+                            _skipped++;
+                            continue;
+                        }
+                        stack.Push(sub);
+                    }
+                    catch (Exception)
+                    {
+                        _skipped++;
+                    }
+                }
             }
 
             // Deepest first so parents are empty by the time we try them.
@@ -392,17 +422,13 @@ namespace CacheTrim
         private static IEnumerable<string> TempTargets()
         {
             List<string> paths = new List<string>();
-            string temp = Environment.GetEnvironmentVariable("TEMP");
-            if (!string.IsNullOrEmpty(temp))
-                paths.Add(temp);
-
             string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
             paths.Add(Path.Combine(windir, "Temp"));
 
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            paths.Add(Path.Combine(local, "Temp"));
             paths.Add(Path.Combine(local, "CrashDumps"));
             paths.Add(Path.Combine(local, @"Microsoft\Windows\INetCache"));
-            paths.Add(Path.Combine(local, @"Microsoft\Windows\WebCache"));
 
             return paths;
         }
@@ -480,46 +506,36 @@ namespace CacheTrim
 
         private static int RunTool(string exe, string args, out string output)
         {
-            output = string.Empty;
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo(exe, args);
-                psi.CreateNoWindow = true;
-                psi.UseShellExecute = false;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-
-                using (Process p = Process.Start(psi))
-                {
-                    output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
-                    if (!p.WaitForExit(15000))
-                    {
-                        try { p.Kill(); }
-                        catch (Exception) { }
-                        return -1;
-                    }
-                    return p.ExitCode;
-                }
+                ProcessResult result = ProcessRunner.Run(exe, args, 15000);
+                output = result.Output;
+                return result.ExitCode;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                output = ex.Message;
                 return -1;
             }
         }
 
-        private static bool StopService(string name)
+        private static bool StopService(string name, out bool restartAfterward)
         {
+            restartAfterward = false;
             try
             {
                 using (ServiceController sc = new ServiceController(name))
                 {
-                    if (sc.Status == ServiceControllerStatus.Stopped ||
-                        sc.Status == ServiceControllerStatus.StopPending)
+                    ServiceControllerStatus status = sc.Status;
+                    if (status == ServiceControllerStatus.Stopped)
                         return true;
+                    if (status != ServiceControllerStatus.Running)
+                        return false;
 
+                    restartAfterward = true;
                     sc.Stop();
                     sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(12));
-                    return true;
+                    return sc.Status == ServiceControllerStatus.Stopped;
                 }
             }
             catch (Exception)

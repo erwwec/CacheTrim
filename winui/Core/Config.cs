@@ -133,8 +133,9 @@ namespace CacheTrim
             return c;
         }
 
-        public void Save()
+        public string Save()
         {
+            string temporaryPath = ConfigPath + ".tmp";
             try
             {
                 Directory.CreateDirectory(ConfigDir);
@@ -166,11 +167,18 @@ namespace CacheTrim
                 sb.AppendLine("glass_density=" + GlassDensity.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("glass_background_blur=" + GlassBackgroundBlur.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("ui_density=" + UiDensity.ToString(CultureInfo.InvariantCulture));
-                File.WriteAllText(ConfigPath, sb.ToString(), new UTF8Encoding(false));
+                File.WriteAllText(temporaryPath, sb.ToString(), new UTF8Encoding(false));
+                if (File.Exists(ConfigPath))
+                    File.Replace(temporaryPath, ConfigPath, null);
+                else
+                    File.Move(temporaryPath, ConfigPath);
+                return null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Read-only profile: settings stay in memory for this run.
+                try { File.Delete(temporaryPath); }
+                catch (Exception) { }
+                return ex.Message;
             }
         }
 

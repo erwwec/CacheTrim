@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
 using System.Text;
@@ -16,18 +15,18 @@ namespace CacheTrim
 
         public static bool IsInstalled()
         {
-            return Run("schtasks.exe", string.Format("/Query /TN \"{0}\"", TaskName)) == 0;
+            return Run(string.Format("/Query /TN \"{0}\"", TaskName)) == 0;
         }
 
         public static string Install(string exePath, int delaySeconds)
         {
+            string xmlPath = null;
             try
             {
-                string xmlPath = Path.Combine(Path.GetTempPath(), "CacheTrimTask.xml");
+                xmlPath = Path.Combine(Path.GetTempPath(), "CacheTrimTask-" + Guid.NewGuid().ToString("N") + ".xml");
                 File.WriteAllText(xmlPath, BuildXml(exePath, delaySeconds), Encoding.Unicode);
 
-                int code = Run("schtasks.exe", string.Format("/Create /XML \"{0}\" /TN \"{1}\" /F", xmlPath, TaskName));
-                TryDelete(xmlPath);
+                int code = Run("/Create /XML \"" + xmlPath + "\" /TN \"" + TaskName + "\" /F");
 
                 if (code != 0)
                     return "schtasks вернул код " + code;
@@ -38,13 +37,17 @@ namespace CacheTrim
             {
                 return ex.Message;
             }
+            finally
+            {
+                if (xmlPath != null) TryDelete(xmlPath);
+            }
         }
 
         public static string Uninstall()
         {
             try
             {
-                int code = Run("schtasks.exe", string.Format("/Delete /TN \"{0}\" /F", TaskName));
+                int code = Run("/Delete /TN \"" + TaskName + "\" /F");
                 if (code == 0)
                     return null;
 
@@ -103,7 +106,7 @@ namespace CacheTrim
             sb.AppendLine("  </Settings>");
             sb.AppendLine("  <Actions Context=\"Author\">");
             sb.AppendLine("    <Exec>");
-            sb.AppendLine("      <Command>\"" + Escape(exePath) + "\"</Command>");
+                sb.AppendLine("      <Command>" + Escape(exePath) + "</Command>");
             sb.AppendLine("      <Arguments>--silent</Arguments>");
             sb.AppendLine("    </Exec>");
             sb.AppendLine("  </Actions>");
@@ -116,22 +119,10 @@ namespace CacheTrim
             return value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
         }
 
-        private static int Run(string exe, string arguments)
+        private static int Run(string arguments)
         {
-            ProcessStartInfo psi = new ProcessStartInfo(exe, arguments);
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
-            psi.WindowStyle = ProcessWindowStyle.Hidden;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-
-            using (Process p = Process.Start(psi))
-            {
-                p.StandardOutput.ReadToEnd();
-                p.StandardError.ReadToEnd();
-                p.WaitForExit(20000);
-                return p.HasExited ? p.ExitCode : -1;
-            }
+            string schtasks = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
+            return ProcessRunner.Run(schtasks, arguments, 20000).ExitCode;
         }
 
         private static void TryDelete(string path)

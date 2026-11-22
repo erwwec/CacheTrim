@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.ServiceProcess;
 using Microsoft.Win32;
 
 namespace CacheTrim
@@ -326,27 +326,127 @@ namespace CacheTrim
             t.Write = delegate(bool on)
             {
                 string output;
-                int startMode = on ? 4 : stockStart;
-
+                string backupPath = @"Software\CacheTrim\TweakBackup\Services\" + serviceName;
                 if (on)
                 {
-                    Run(ScExe, "stop \"" + serviceName + "\"", out output);
+                    object currentValue = ServiceStart(serviceName);
+                    if (currentValue == null)
+                        return "не удалось прочитать параметры службы " + serviceName;
+
+                    bool wasRunning;
+                    string statusError = GetServiceRunning(serviceName, out wasRunning);
+                    if (statusError != null)
+                        return statusError;
+
+                    using (RegistryKey existing = Registry.CurrentUser.OpenSubKey(backupPath))
+                    {
+                        if (existing == null)
+                        {
+                            using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(backupPath))
+                            {
+                                if (backup == null)
+                                    return "не удалось сохранить исходные параметры службы";
+                                backup.SetValue("Start", Convert.ToInt32(currentValue, CultureInfo.InvariantCulture), RegistryValueKind.DWord);
+                                backup.SetValue("WasRunning", wasRunning ? 1 : 0, RegistryValueKind.DWord);
+                            }
+                        }
+                    }
+
+                    statusError = StopServiceIfRunning(serviceName, wasRunning);
+                    if (statusError != null)
+                        return statusError;
+
+                    int disableCode = Run(ScExe, "config \"" + serviceName + "\" start= disabled", out output);
+                    if (disableCode != 0)
+                    {
+                        if (wasRunning) StartServiceIfNeeded(serviceName);
+                        return "sc config " + serviceName + ": " + output;
+                    }
+                    return null;
                 }
 
-                int code = Run(ScExe,
-                    "config \"" + serviceName + "\" start= " + StartName(startMode), out output);
+                int startMode = stockStart;
+                bool startAfterRestore = false;
+                using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath))
+                {
+                    if (backup != null)
+                    {
+                        object savedStart = backup.GetValue("Start");
+                        if (savedStart != null)
+                            startMode = Convert.ToInt32(savedStart, CultureInfo.InvariantCulture);
+                        object wasRunning = backup.GetValue("WasRunning");
+                        startAfterRestore = wasRunning != null && Convert.ToInt32(wasRunning, CultureInfo.InvariantCulture) != 0;
+                    }
+                }
+
+                int code = Run(ScExe, "config \"" + serviceName + "\" start= " + StartName(startMode), out output);
                 if (code != 0)
                     return "sc config " + serviceName + ": " + output;
 
-                if (!on)
+                if (startAfterRestore)
                 {
-                    int startCode = Run(ScExe, "start \"" + serviceName + "\"", out output);
-                    if (startCode != 0 && output.IndexOf("already", StringComparison.OrdinalIgnoreCase) < 0)
-                        return "служба настроена, но не запустилась: " + output;
+                    string startError = StartServiceIfNeeded(serviceName);
+                    if (startError != null)
+                        return startError;
                 }
+
+                try { Registry.CurrentUser.DeleteSubKeyTree(backupPath, false); }
+                catch (Exception) { }
                 return null;
             };
             return t;
+        }
+
+        private static string GetServiceRunning(string serviceName, out bool running)
+        {
+            running = false;
+            try
+            {
+                using (ServiceController service = new ServiceController(serviceName))
+                {
+                    ServiceControllerStatus status = service.Status;
+                    if (status == ServiceControllerStatus.Running) running = true;
+                    else if (status != ServiceControllerStatus.Stopped)
+                        return "служба " + serviceName + " занята другой операцией";
+                }
+                return null;
+            }
+            catch (Exception ex) { return "не удалось проверить службу " + serviceName + ": " + ex.Message; }
+        }
+
+        private static string StopServiceIfRunning(string serviceName, bool wasRunning)
+        {
+            if (!wasRunning) return null;
+            try
+            {
+                using (ServiceController service = new ServiceController(serviceName))
+                {
+                    if (service.Status == ServiceControllerStatus.Stopped) return null;
+                    if (service.Status != ServiceControllerStatus.Running)
+                        return "служба " + serviceName + " занята другой операцией";
+                    service.Stop();
+                    service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(20));
+                    return service.Status == ServiceControllerStatus.Stopped ? null : "не удалось остановить службу " + serviceName;
+                }
+            }
+            catch (Exception ex) { return "не удалось остановить службу " + serviceName + ": " + ex.Message; }
+        }
+
+        private static string StartServiceIfNeeded(string serviceName)
+        {
+            try
+            {
+                using (ServiceController service = new ServiceController(serviceName))
+                {
+                    if (service.Status == ServiceControllerStatus.Running) return null;
+                    if (service.Status != ServiceControllerStatus.Stopped)
+                        return "служба " + serviceName + " занята другой операцией";
+                    service.Start();
+                    service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
+                    return service.Status == ServiceControllerStatus.Running ? null : "служба " + serviceName + " не запустилась";
+                }
+            }
+            catch (Exception ex) { return "не удалось запустить службу " + serviceName + ": " + ex.Message; }
         }
 
         private static string StartName(int start)
@@ -396,22 +496,11 @@ namespace CacheTrim
         }
 
         /// <summary>Runs a console tool and returns its exit code; output is collected for error text.</summary>
-        public static int Run(string exe, string arguments, out string output)
+        public static int Run(string exe, string arguments, out string output, int timeoutMilliseconds = 30000)
         {
-            ProcessStartInfo psi = new ProcessStartInfo(exe, arguments);
-            psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            psi.CreateNoWindow = true;
-
-            using (Process p = Process.Start(psi))
-            {
-                string stdout = p.StandardOutput.ReadToEnd();
-                string stderr = p.StandardError.ReadToEnd();
-                p.WaitForExit(30000);
-                output = (stdout + " " + stderr).Trim();
-                return p.HasExited ? p.ExitCode : -1;
-            }
+            ProcessResult result = ProcessRunner.Run(exe, arguments, timeoutMilliseconds);
+            output = result.Output;
+            return result.ExitCode;
         }
 
         private const uint SpiSetUiEffects = 0x103F;

@@ -79,7 +79,7 @@
                     <DockPanel Margin="10,12,10,10">
                         <StackPanel DockPanel.Dock="Top" Margin="8,2,8,14">
                             <TextBlock Text="CacheTrim" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            <TextBlock Text="SYSTEM TOOLS · 2.1" FontSize="10" Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            <TextBlock x:Name="BrandVersion" Text="SYSTEM TOOLS" FontSize="10" Margin="0,2,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,0">
                             <TextBlock x:Name="AdminText" Text="АДМИНИСТРАТОР" FontSize="10" FontWeight="SemiBold" />

@@ -87,7 +87,7 @@ namespace CacheTrim
                         Entry e = new Entry();
                         e.Origin = source;
                         e.Name = name;
-                        e.Command = Convert.ToString(key.GetValue(name));
+                        e.Command = Convert.ToString(key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
                         e.Enabled = true;
                         e.RequiresAdmin = source != Source.CurrentUser;
                         e.Location = key.Name;
@@ -142,7 +142,7 @@ namespace CacheTrim
                     Entry e = new Entry();
                     e.Origin = source;
                     e.Name = Path.GetFileNameWithoutExtension(file);
-                    e.Command = Path.GetFileName(file) + "  (отключено)";
+                    e.Command = Path.GetFileName(file);
                     e.Enabled = false;
                     e.RequiresAdmin = source == Source.CommonStartupFolder;
                     e.Location = folder;
@@ -176,7 +176,7 @@ namespace CacheTrim
                             Entry e = new Entry();
                             e.Origin = source;
                             e.Name = name;
-                            e.Command = Convert.ToString(key.GetValue(name)) + "  (отключено)";
+                            e.Command = Convert.ToString(key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
                             e.Enabled = false;
                             e.RequiresAdmin = source != Source.CurrentUser;
                             e.Location = source == Source.LocalMachine32
@@ -227,13 +227,24 @@ namespace CacheTrim
                     if (key == null)
                         return "ключ автозагрузки недоступен";
 
-                    object value = key.GetValue(e.Name);
+                    object value = key.GetValue(e.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
                     if (value == null)
                         return "запись уже удалена";
 
+                    RegistryValueKind kind = key.GetValueKind(e.Name);
+
                     using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(backupPath))
-                        backup.SetValue(e.Name, value);
-                    key.DeleteValue(e.Name, false);
+                        backup.SetValue(e.Name, value, kind);
+                    try
+                    {
+                        key.DeleteValue(e.Name, false);
+                    }
+                    catch
+                    {
+                        using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath, true))
+                            if (backup != null) backup.DeleteValue(e.Name, false);
+                        throw;
+                    }
                 }
                 return null;
             }
@@ -243,12 +254,19 @@ namespace CacheTrim
                 if (backup == null)
                     return "нет резервной копии записи";
 
-                object value = backup.GetValue(e.Name);
+                object value = backup.GetValue(e.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
                 if (value == null)
                     return "нет резервной копии записи";
 
+                using (RegistryKey existing = root.OpenSubKey(sub, true))
+                {
+                    if (existing != null && existing.GetValue(e.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) != null)
+                        return "запись с таким именем уже есть в автозагрузке; резерв сохранён";
+                }
+
+                RegistryValueKind kind = backup.GetValueKind(e.Name);
                 using (RegistryKey key = root.CreateSubKey(sub))
-                    key.SetValue(e.Name, value);
+                    key.SetValue(e.Name, value, kind);
             }
 
             using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath, true))
