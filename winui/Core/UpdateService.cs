@@ -138,14 +138,16 @@ internal static class UpdateService
         string logPath = Path.Combine(updateRoot, "ApplyUpdate.log");
         StringBuilder script = new();
         script.AppendLine("$ErrorActionPreference = 'Stop'");
-        script.AppendLine("$processId = " + processId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // Do not name this PowerShell variable $processId: variable names are case-insensitive,
+        // so that would collide with PowerShell's read-only automatic variable $PID.
+        script.AppendLine("$parentPid = " + processId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         script.AppendLine("$source = " + PowerShellLiteral(stagedExe));
         script.AppendLine("$target = " + PowerShellLiteral(targetExe));
         script.AppendLine("$log = " + PowerShellLiteral(logPath));
         script.AppendLine("$expectedHash = " + PowerShellLiteral(actual));
         script.AppendLine("try {");
         script.AppendLine("  Set-Content -LiteralPath $log -Value ('Starting update ' + (Get-Date -Format o)) -Encoding UTF8");
-        script.AppendLine("  Wait-Process -Id $processId -ErrorAction SilentlyContinue");
+        script.AppendLine("  Wait-Process -Id $parentPid -ErrorAction SilentlyContinue");
         script.AppendLine("$backup = $target + '.previous'");
         script.AppendLine("  if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination $backup -Force }");
         script.AppendLine("$installed = $false");
