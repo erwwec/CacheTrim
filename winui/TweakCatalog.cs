@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32;
 
 namespace CacheTrim
@@ -302,11 +304,147 @@ namespace CacheTrim
             };
             t.Write = delegate(bool on)
             {
-                foreach (RegItem item in items)
-                    WriteValue(item.Machine, item.Path, item.Value, on ? item.On : item.Off);
-                return null;
+                return ApplyRegistryItems(items, on);
             };
             return t;
+        }
+
+        internal static string ApplyRegistryItems(RegItem[] items, bool on)
+        {
+            if (on)
+            {
+                foreach (RegItem item in items)
+                    CaptureRegistryValue(item);
+
+                try
+                {
+                    foreach (RegItem item in items)
+                        WriteValue(item.Machine, item.Path, item.Value, item.On);
+                }
+                catch (Exception applyError)
+                {
+                    Exception rollbackError = null;
+                    foreach (RegItem item in items)
+                    {
+                        try { RestoreRegistryValue(item); }
+                        catch (Exception ex) { if (rollbackError == null) rollbackError = ex; }
+                    }
+                    if (rollbackError == null)
+                    {
+                        foreach (RegItem item in items)
+                            DeleteRegistryBackup(item);
+                        throw;
+                    }
+                    throw new InvalidOperationException(applyError.Message + "; не удалось полностью вернуть исходные параметры: " + rollbackError.Message, applyError);
+                }
+                return null;
+            }
+
+            foreach (RegItem item in items)
+            {
+                if (!RestoreRegistryValue(item))
+                    WriteValue(item.Machine, item.Path, item.Value, item.Off);
+            }
+            foreach (RegItem item in items)
+                DeleteRegistryBackup(item);
+            return null;
+        }
+
+        private static void CaptureRegistryValue(RegItem item)
+        {
+            string backupPath = RegistryBackupPath(item);
+            using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(backupPath))
+            {
+                if (backup == null)
+                    throw new InvalidOperationException("не удалось сохранить исходное значение реестра");
+                if (Convert.ToInt32(backup.GetValue("Captured", 0), CultureInfo.InvariantCulture) == 1)
+                    return;
+
+                foreach (string name in backup.GetValueNames())
+                    backup.DeleteValue(name, false);
+
+                bool exists = false;
+                object original = null;
+                RegistryValueKind kind = RegistryValueKind.String;
+                using (RegistryKey root = item.Machine ? Registry.LocalMachine : Registry.CurrentUser)
+                using (RegistryKey key = root.OpenSubKey(item.Path))
+                {
+                    if (key != null)
+                    {
+                        foreach (string name in key.GetValueNames())
+                        {
+                            if (string.Equals(name, item.Value, StringComparison.OrdinalIgnoreCase))
+                            {
+                                exists = true;
+                                original = key.GetValue(item.Value, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                                kind = key.GetValueKind(item.Value);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                backup.SetValue("Exists", exists ? 1 : 0, RegistryValueKind.DWord);
+                if (exists)
+                {
+                    if (original == null)
+                        throw new InvalidOperationException("не удалось прочитать исходное значение реестра");
+                    backup.SetValue("Kind", (int)kind, RegistryValueKind.DWord);
+                    backup.SetValue("Data", original, kind);
+                }
+                backup.SetValue("Captured", 1, RegistryValueKind.DWord);
+            }
+        }
+
+        private static bool RestoreRegistryValue(RegItem item)
+        {
+            string backupPath = RegistryBackupPath(item);
+            using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath))
+            {
+                if (backup == null || Convert.ToInt32(backup.GetValue("Captured", 0), CultureInfo.InvariantCulture) != 1)
+                    return false;
+
+                bool existed = Convert.ToInt32(backup.GetValue("Exists", 0), CultureInfo.InvariantCulture) == 1;
+                using (RegistryKey root = item.Machine ? Registry.LocalMachine : Registry.CurrentUser)
+                {
+                    if (existed)
+                    {
+                        object data = backup.GetValue("Data", null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                        if (data == null)
+                            throw new InvalidOperationException("резервная копия значения реестра повреждена");
+                        RegistryValueKind kind = (RegistryValueKind)Convert.ToInt32(backup.GetValue("Kind"), CultureInfo.InvariantCulture);
+                        using (RegistryKey key = root.CreateSubKey(item.Path))
+                        {
+                            if (key == null)
+                                throw new InvalidOperationException("не удалось восстановить ключ реестра");
+                            key.SetValue(item.Value, data, kind);
+                        }
+                    }
+                    else
+                    {
+                        using (RegistryKey key = root.OpenSubKey(item.Path, true))
+                        {
+                            if (key != null)
+                                key.DeleteValue(item.Value, false);
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+
+        private static void DeleteRegistryBackup(RegItem item)
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(RegistryBackupPath(item), false);
+        }
+
+        private static string RegistryBackupPath(RegItem item)
+        {
+            string identity = (item.Machine ? "HKLM" : "HKCU") + "\n" + item.Path + "\n" + item.Value;
+            byte[] hash;
+            using (SHA256 sha = SHA256.Create())
+                hash = sha.ComputeHash(Encoding.UTF8.GetBytes(identity));
+            return @"Software\CacheTrim\TweakBackup\Registry\" + BitConverter.ToString(hash).Replace("-", string.Empty);
         }
 
         private static Tweak Service(string group, string name, string hint, string serviceName, int stockStart)

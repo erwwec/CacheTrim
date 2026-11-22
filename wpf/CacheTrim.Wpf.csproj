@@ -4,10 +4,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>CacheTrim</RootNamespace>
     <AssemblyName>CacheTrim</AssemblyName>
-    <Version>2.1.6</Version>
-    <AssemblyVersion>2.1.6.0</AssemblyVersion>
-    <FileVersion>2.1.6.0</FileVersion>
-    <InformationalVersion>2.1.6</InformationalVersion>
+    <Version>2.1.7</Version>
+    <AssemblyVersion>2.1.7.0</AssemblyVersion>
+    <FileVersion>2.1.7.0</FileVersion>
+    <InformationalVersion>2.1.7</InformationalVersion>
     <ApplicationManifest>..\app.manifest</ApplicationManifest>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
