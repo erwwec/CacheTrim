@@ -51,6 +51,8 @@ public partial class MainWindow : Window
     private StackPanel? _cleanLeftColumn;
     private StackPanel? _cleanRightColumn;
     private double _cleanCardWidth;
+    private Rect _windowRestoreBounds;
+    private bool _coversTaskbar;
     private int _lastBackdropResult = int.MinValue;
 
     public MainWindow(int startPage = 0)
@@ -80,9 +82,40 @@ public partial class MainWindow : Window
         RefreshMemory();
     }
 
-    private void OnWindowStateChanged(object? sender, EventArgs e) => MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+    private void OnWindowStateChanged(object? sender, EventArgs e) => MaximizeButton.Content = WindowState == WindowState.Maximized || _coversTaskbar ? "❐" : "□";
     private void OnMinimizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-    private void OnMaximizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    private void OnMaximizeClick(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Normal;
+            _coversTaskbar = false;
+            MaximizeButton.Content = "□";
+            return;
+        }
+        if (_coversTaskbar)
+        {
+            _coversTaskbar = false;
+            Left = _windowRestoreBounds.Left;
+            Top = _windowRestoreBounds.Top;
+            Width = _windowRestoreBounds.Width;
+            Height = _windowRestoreBounds.Height;
+            MaximizeButton.Content = "□";
+            return;
+        }
+
+        _windowRestoreBounds = new Rect(Left, Top, Width, Height);
+        System.Windows.Forms.Screen screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);
+        Matrix fromDevice = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        WpfPoint origin = fromDevice.Transform(new WpfPoint(screen.Bounds.Left, screen.Bounds.Top));
+        Vector size = fromDevice.Transform(new Vector(screen.Bounds.Width, screen.Bounds.Height));
+        Left = origin.X;
+        Top = origin.Y;
+        Width = size.X;
+        Height = size.Y;
+        _coversTaskbar = true;
+        MaximizeButton.Content = "❐";
+    }
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
     private void OnTitleBarMouseDown(object sender, MouseButtonEventArgs e)
@@ -522,14 +555,12 @@ public partial class MainWindow : Window
         double viewport = PageScroll.ViewportWidth > 0 ? PageScroll.ViewportWidth : Math.Max(720, ActualWidth - 224);
         double available = Math.Max(600, viewport - 52);
         bool twoColumns = available >= 760;
-        Grid cards = new() { HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch, VerticalAlignment = System.Windows.VerticalAlignment.Top };
-        cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        if (twoColumns) cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        WrapPanel cards = new() { HorizontalAlignment = System.Windows.HorizontalAlignment.Left, VerticalAlignment = System.Windows.VerticalAlignment.Top };
         _cleanCardWidth = twoColumns ? (available - 16) / 2 : available;
-        _cleanLeftColumn = new StackPanel { Margin = new Thickness(0, 0, twoColumns ? 12 : 0, 0), VerticalAlignment = System.Windows.VerticalAlignment.Top };
-        _cleanRightColumn = twoColumns ? new StackPanel { VerticalAlignment = System.Windows.VerticalAlignment.Top } : _cleanLeftColumn;
+        _cleanLeftColumn = new StackPanel { Width = _cleanCardWidth, Margin = new Thickness(0, 0, twoColumns ? 12 : 0, 0), VerticalAlignment = System.Windows.VerticalAlignment.Top };
+        _cleanRightColumn = twoColumns ? new StackPanel { Width = _cleanCardWidth, VerticalAlignment = System.Windows.VerticalAlignment.Top } : _cleanLeftColumn;
         cards.Children.Add(_cleanLeftColumn);
-        if (twoColumns) { Grid.SetColumn(_cleanRightColumn, 1); cards.Children.Add(_cleanRightColumn); }
+        if (twoColumns) cards.Children.Add(_cleanRightColumn);
         Config c = _settings;
         AddCleanGroup("ПАМЯТЬ", new[]
         {
