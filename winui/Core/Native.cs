@@ -211,7 +211,12 @@ namespace CacheTrim
             const uint NOPROGRESSUI = 0x00000002;
             const uint NOSOUND = 0x00000004;
             int hr = SHEmptyRecycleBin(IntPtr.Zero, null, NOCONFIRMATION | NOPROGRESSUI | NOSOUND);
-            return hr == 0; // S_OK; S_FALSE when already empty counts as cleaned
+            return IsRecycleBinResultSuccessful(hr);
+        }
+
+        internal static bool IsRecycleBinResultSuccessful(int result)
+        {
+            return result >= 0;
         }
 
         public sealed class MemStats
