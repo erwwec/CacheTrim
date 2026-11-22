@@ -1,0 +1,143 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Security.Principal;
+using System.Text;
+
+namespace CacheTrim
+{
+    /// <summary>
+    /// Registers/unregisters the logon task through schtasks + an XML definition.
+    /// HighestAvailable means the task runs elevated without a UAC prompt.
+    /// </summary>
+    internal static class TaskSetup
+    {
+        public const string TaskName = "CacheTrim Autostart";
+
+        public static bool IsInstalled()
+        {
+            return Run("schtasks.exe", string.Format("/Query /TN \"{0}\"", TaskName)) == 0;
+        }
+
+        public static string Install(string exePath, int delaySeconds)
+        {
+            try
+            {
+                string xmlPath = Path.Combine(Path.GetTempPath(), "CacheTrimTask.xml");
+                File.WriteAllText(xmlPath, BuildXml(exePath, delaySeconds), Encoding.Unicode);
+
+                int code = Run("schtasks.exe", string.Format("/Create /XML \"{0}\" /TN \"{1}\" /F", xmlPath, TaskName));
+                TryDelete(xmlPath);
+
+                if (code != 0)
+                    return "schtasks вернул код " + code;
+
+                return IsInstalled() ? null : "задача создана, но не найдена при проверке";
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        public static string Uninstall()
+        {
+            try
+            {
+                int code = Run("schtasks.exe", string.Format("/Delete /TN \"{0}\" /F", TaskName));
+                if (code == 0)
+                    return null;
+
+                return IsInstalled() ? "schtasks вернул код " + code : null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        private static string BuildXml(string exePath, int delaySeconds)
+        {
+            string user = WindowsIdentity.GetCurrent().Name;
+            string delay = "PT" + Math.Max(0, delaySeconds) + "S";
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-16\"?>");
+            sb.AppendLine("<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">");
+            sb.AppendLine("  <RegistrationInfo>");
+            sb.AppendLine("    <Description>CacheTrim: чистка кэша и standby-списка при входе в систему</Description>");
+            sb.AppendLine("    <URI>\\" + TaskName + "</URI>");
+            sb.AppendLine("  </RegistrationInfo>");
+            sb.AppendLine("  <Triggers>");
+            sb.AppendLine("    <LogonTrigger>");
+            sb.AppendLine("      <Enabled>true</Enabled>");
+            sb.AppendLine("      <UserId>" + Escape(user) + "</UserId>");
+            sb.AppendLine("      <Delay>" + delay + "</Delay>");
+            sb.AppendLine("    </LogonTrigger>");
+            sb.AppendLine("  </Triggers>");
+            sb.AppendLine("  <Principals>");
+            sb.AppendLine("    <Principal id=\"Author\">");
+            sb.AppendLine("      <UserId>" + Escape(user) + "</UserId>");
+            sb.AppendLine("      <LogonType>InteractiveToken</LogonType>");
+            sb.AppendLine("      <RunLevel>HighestAvailable</RunLevel>");
+            sb.AppendLine("    </Principal>");
+            sb.AppendLine("  </Principals>");
+            sb.AppendLine("  <Settings>");
+            sb.AppendLine("    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>");
+            sb.AppendLine("    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>");
+            sb.AppendLine("    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>");
+            sb.AppendLine("    <AllowHardTerminate>true</AllowHardTerminate>");
+            sb.AppendLine("    <StartWhenAvailable>true</StartWhenAvailable>");
+            sb.AppendLine("    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>");
+            sb.AppendLine("    <IdleSettings>");
+            sb.AppendLine("      <StopOnIdleEnd>false</StopOnIdleEnd>");
+            sb.AppendLine("      <RestartOnIdle>false</RestartOnIdle>");
+            sb.AppendLine("    </IdleSettings>");
+            sb.AppendLine("    <AllowStartOnDemand>true</AllowStartOnDemand>");
+            sb.AppendLine("    <Enabled>true</Enabled>");
+            sb.AppendLine("    <Hidden>true</Hidden>");
+            sb.AppendLine("    <RunOnlyIfIdle>false</RunOnlyIfIdle>");
+            sb.AppendLine("    <WakeToRun>false</WakeToRun>");
+            sb.AppendLine("    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>");
+            sb.AppendLine("    <Priority>7</Priority>");
+            sb.AppendLine("  </Settings>");
+            sb.AppendLine("  <Actions Context=\"Author\">");
+            sb.AppendLine("    <Exec>");
+            sb.AppendLine("      <Command>\"" + Escape(exePath) + "\"</Command>");
+            sb.AppendLine("      <Arguments>--silent</Arguments>");
+            sb.AppendLine("    </Exec>");
+            sb.AppendLine("  </Actions>");
+            sb.AppendLine("</Task>");
+            return sb.ToString();
+        }
+
+        private static string Escape(string value)
+        {
+            return value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+        }
+
+        private static int Run(string exe, string arguments)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo(exe, arguments);
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+
+            using (Process p = Process.Start(psi))
+            {
+                p.StandardOutput.ReadToEnd();
+                p.StandardError.ReadToEnd();
+                p.WaitForExit(20000);
+                return p.HasExited ? p.ExitCode : -1;
+            }
+        }
+
+        private static void TryDelete(string path)
+        {
+            try { File.Delete(path); }
+            catch (Exception) { }
+        }
+    }
+}
