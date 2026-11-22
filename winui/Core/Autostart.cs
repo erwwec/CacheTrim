@@ -102,32 +102,35 @@ namespace CacheTrim
 
         private static void AddFolder(List<Entry> entries, Source source, string folder)
         {
-            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            if (string.IsNullOrEmpty(folder))
                 return;
 
-            string[] files;
-            try
+            if (Directory.Exists(folder))
             {
-                files = Directory.GetFiles(folder);
-            }
-            catch (Exception)
-            {
-                return;
-            }
+                string[] files;
+                try
+                {
+                    files = Directory.GetFiles(folder);
+                }
+                catch (Exception)
+                {
+                    files = new string[0];
+                }
 
-            foreach (string file in files)
-            {
-                if (file.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                foreach (string file in files)
+                {
+                    if (file.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                Entry e = new Entry();
-                e.Origin = source;
-                e.Name = Path.GetFileNameWithoutExtension(file);
-                e.Command = Path.GetFileName(file);
-                e.Enabled = true;
-                e.RequiresAdmin = source == Source.CommonStartupFolder;
-                e.Location = folder;
-                entries.Add(e);
+                    Entry e = new Entry();
+                    e.Origin = source;
+                    e.Name = Path.GetFileNameWithoutExtension(file);
+                    e.Command = Path.GetFileName(file);
+                    e.Enabled = true;
+                    e.RequiresAdmin = source == Source.CommonStartupFolder;
+                    e.Location = folder;
+                    entries.Add(e);
+                }
             }
 
             // Entries parked by CacheTrim show up as disabled rows.
