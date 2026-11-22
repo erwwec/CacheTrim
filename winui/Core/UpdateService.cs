@@ -145,11 +145,12 @@ internal static class UpdateService
         script.AppendLine("$target = " + PowerShellLiteral(targetExe));
         script.AppendLine("$log = " + PowerShellLiteral(logPath));
         script.AppendLine("$expectedHash = " + PowerShellLiteral(actual));
+        script.AppendLine("$backupCreated = $false");
         script.AppendLine("try {");
         script.AppendLine("  Set-Content -LiteralPath $log -Value ('Starting update ' + (Get-Date -Format o)) -Encoding UTF8");
         script.AppendLine("  Wait-Process -Id $parentPid -ErrorAction SilentlyContinue");
         script.AppendLine("$backup = $target + '.previous'");
-        script.AppendLine("  if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination $backup -Force }");
+        script.AppendLine("  if (Test-Path -LiteralPath $target) { Copy-Item -LiteralPath $target -Destination $backup -Force; $backupCreated = $true }");
         script.AppendLine("$installed = $false");
         script.AppendLine("  for ($i = 0; $i -lt 20; $i++) { try { [System.IO.File]::Copy($source, $target, $true); $installed = $true; break } catch { Start-Sleep -Seconds 1 } }");
         script.AppendLine("  if (-not $installed) { throw 'Windows не разрешила заменить CacheTrim.exe.' }");
@@ -159,7 +160,7 @@ internal static class UpdateService
         script.AppendLine("  Start-Process -FilePath $target");
         script.AppendLine("} catch {");
         script.AppendLine("  Add-Content -LiteralPath $log -Value ('UPDATE FAILED: ' + $_.Exception.Message) -Encoding UTF8");
-        script.AppendLine("  if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup -Destination $target -Force; Start-Process -FilePath $target }");
+        script.AppendLine("  if ($backupCreated -and (Test-Path -LiteralPath $backup)) { Copy-Item -LiteralPath $backup -Destination $target -Force; Start-Process -FilePath $target }");
         script.AppendLine("  try { (New-Object -ComObject WScript.Shell).Popup('Не удалось установить обновление CacheTrim. Старая версия сохранена. Подробности: ' + $log, 0, 'CacheTrim — обновление', 48) | Out-Null } catch { }");
         script.AppendLine("}");
         File.WriteAllText(scriptPath, script.ToString(), Encoding.Unicode);

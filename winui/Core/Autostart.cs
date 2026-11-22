@@ -226,27 +226,13 @@ namespace CacheTrim
                 {
                     if (key == null)
                         return "ключ автозагрузки недоступен";
-
-                    object value = key.GetValue(e.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
-                    if (value == null)
-                        return "запись уже удалена";
-
-                    RegistryValueKind kind = key.GetValueKind(e.Name);
-
                     using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(backupPath))
-                        backup.SetValue(e.Name, value, kind);
-                    try
                     {
-                        key.DeleteValue(e.Name, false);
-                    }
-                    catch
-                    {
-                        using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath, true))
-                            if (backup != null) backup.DeleteValue(e.Name, false);
-                        throw;
+                        if (backup == null)
+                            return "резерв автозагрузки недоступен";
+                        return MoveRegistryValueToBackup(key, backup, e.Name);
                     }
                 }
-                return null;
             }
 
             using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(backupPath))
@@ -273,6 +259,33 @@ namespace CacheTrim
             {
                 if (backup != null)
                     backup.DeleteValue(e.Name, false);
+            }
+            return null;
+        }
+
+        internal static string MoveRegistryValueToBackup(RegistryKey source, RegistryKey backup, string name)
+        {
+            foreach (string existingName in backup.GetValueNames())
+            {
+                if (string.Equals(existingName, name, StringComparison.OrdinalIgnoreCase))
+                    return "резервная запись с таким именем уже существует; новая запись не отключена";
+            }
+
+            object value = source.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            if (value == null)
+                return "запись уже удалена";
+
+            RegistryValueKind kind = source.GetValueKind(name);
+            backup.SetValue(name, value, kind);
+            try
+            {
+                source.DeleteValue(name, false);
+            }
+            catch
+            {
+                try { backup.DeleteValue(name, false); }
+                catch (Exception) { }
+                throw;
             }
             return null;
         }

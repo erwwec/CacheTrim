@@ -240,10 +240,15 @@ namespace CacheTrim
 
             MEMORYSTATUSEX ms = new MEMORYSTATUSEX();
             ms.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
-            if (GlobalMemoryStatusEx(ref ms))
+            bool memoryStatusOk = GlobalMemoryStatusEx(ref ms);
+            if (memoryStatusOk)
             {
                 s.TotalPhys = ms.ullTotalPhys;
                 s.AvailPhys = ms.ullAvailPhys;
+            }
+            else
+            {
+                s.QueryFailed = true;
             }
 
             PERFORMANCE_INFORMATION pi;
@@ -253,6 +258,8 @@ namespace CacheTrim
                 s.Cache = (ulong)pi.SystemCache.ToInt64() * page;
                 s.CommitUsed = (ulong)pi.CommitTotal.ToInt64() * page;
                 s.CommitLimit = (ulong)pi.CommitLimit.ToInt64() * page;
+                if (!memoryStatusOk)
+                    s.TotalPhys = (ulong)pi.PhysicalTotal.ToInt64() * page;
                 s.AvailPhys = (ulong)pi.PhysicalAvailable.ToInt64() * page;
                 s.ProcessCount = pi.ProcessCount;
                 s.HandleCount = pi.HandleCount;
@@ -270,7 +277,7 @@ namespace CacheTrim
             ulong zeroPages = 0;
             ulong freePages = 0;
             ulong modifiedPages = 0;
-            if (QueryMemoryLists(out zeroPages, out freePages, out modifiedPages))
+            if (pageSize > 0 && QueryMemoryLists(out zeroPages, out freePages, out modifiedPages))
             {
                 s.Free = (zeroPages + freePages) * pageSize;
                 s.Modified = modifiedPages * pageSize;

@@ -73,6 +73,8 @@ namespace CacheTrim
 
         private const string PowerSchemes = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
         private const string ServicesKey = @"SYSTEM\CurrentControlSet\Services\";
+        private const string PowerPlanBackup = @"Software\CacheTrim\TweakBackup\PowerPlan";
+        private const string VisualEffectsBackup = @"Software\CacheTrim\TweakBackup\VisualEffects";
 
         public static List<Tweak> All()
         {
@@ -206,19 +208,52 @@ namespace CacheTrim
             t.NeedsSignOut = false;
             t.Read = delegate
             {
-                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(PowerSchemes))
-                {
-                    if (k == null)
-                        return false;
-                    string active = k.GetValue("ActivePowerScheme") as string;
-                    return active != null &&
-                        active.Equals(HighPerfScheme, StringComparison.OrdinalIgnoreCase);
-                }
+                string active = GetActivePowerScheme();
+                return active != null && active.Equals(HighPerfScheme, StringComparison.OrdinalIgnoreCase);
             };
             t.Write = delegate(bool on)
             {
+                string target = on ? HighPerfScheme : BalancedScheme;
+                bool createdBackup = false;
+                if (on)
+                {
+                    using (RegistryKey existing = Registry.CurrentUser.OpenSubKey(PowerPlanBackup))
+                    {
+                        if (existing == null)
+                        {
+                            string active = GetActivePowerScheme();
+                            if (string.IsNullOrEmpty(active))
+                                return "не удалось прочитать текущий план питания";
+                            using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(PowerPlanBackup))
+                            {
+                                if (backup == null) return "не удалось сохранить текущий план питания";
+                                backup.SetValue("Scheme", active, RegistryValueKind.String);
+                                createdBackup = true;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(PowerPlanBackup))
+                    {
+                        string original = backup == null ? null : backup.GetValue("Scheme") as string;
+                        if (!string.IsNullOrEmpty(original)) target = original;
+                    }
+                }
+
                 string output;
-                int code = Run("powercfg.exe", "/setactive " + (on ? HighPerfScheme : BalancedScheme), out output);
+                int code = Run("powercfg.exe", "/setactive " + target, out output);
+                if (code != 0 && createdBackup)
+                {
+                    try { Registry.CurrentUser.DeleteSubKeyTree(PowerPlanBackup, false); }
+                    catch (Exception) { }
+                }
+                if (code == 0 && !on)
+                {
+                    try { Registry.CurrentUser.DeleteSubKeyTree(PowerPlanBackup, false); }
+                    catch (Exception) { }
+                }
                 return code == 0 ? null : "powercfg: " + output;
             };
             return t;
@@ -270,17 +305,104 @@ namespace CacheTrim
                     return v != null && Convert.ToInt32(v, CultureInfo.InvariantCulture) == 2;
                 }
             };
+            RegItem visualEffectsItem = new RegItem
+            {
+                Machine = false,
+                Path = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects",
+                Value = "VisualFXSetting",
+                On = 2,
+                Off = 0
+            };
             t.Write = delegate(bool on)
             {
-                WriteValue(false, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects",
-                    "VisualFXSetting", on ? 2 : 0);
-
-                bool effects = !on;
-                SystemParametersInfo(SpiSetUiEffects, (uint)(effects ? 1 : 0), IntPtr.Zero,
-                    SpifUpdateIniFile | SpifSendChange);
+                RegItem[] items = { visualEffectsItem };
+                if (on)
+                {
+                    CaptureRegistryValue(visualEffectsItem);
+                    CaptureUiEffects();
+                    bool registryApplied = false;
+                    try
+                    {
+                        ApplyRegistryItems(items, true);
+                        registryApplied = true;
+                        if (!SetUiEffects(false))
+                        {
+                            RestoreVisualEffects(visualEffectsItem);
+                            throw new InvalidOperationException("не удалось отключить системные эффекты интерфейса");
+                        }
+                    }
+                    catch
+                    {
+                        if (!registryApplied) DeleteUiEffectsBackup();
+                        throw;
+                    }
+                }
+                else
+                {
+                    RestoreVisualEffects(visualEffectsItem);
+                }
                 return null;
             };
             return t;
+        }
+
+        private static string GetActivePowerScheme()
+        {
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(PowerSchemes))
+                return key == null ? null : key.GetValue("ActivePowerScheme") as string;
+        }
+
+        private static void CaptureUiEffects()
+        {
+            using (RegistryKey backup = Registry.CurrentUser.CreateSubKey(VisualEffectsBackup))
+            {
+                if (backup == null) throw new InvalidOperationException("не удалось сохранить параметры интерфейса");
+                if (Convert.ToInt32(backup.GetValue("Captured", 0), CultureInfo.InvariantCulture) == 1) return;
+                int current = 0;
+                IntPtr value = Marshal.AllocHGlobal(sizeof(int));
+                try
+                {
+                    if (!SystemParametersInfo(SpiGetUiEffects, 0, value, 0))
+                        throw new InvalidOperationException("не удалось прочитать параметры системных эффектов");
+                    current = Marshal.ReadInt32(value);
+                }
+                finally { Marshal.FreeHGlobal(value); }
+                backup.SetValue("Enabled", current == 0 ? 0 : 1, RegistryValueKind.DWord);
+                backup.SetValue("Captured", 1, RegistryValueKind.DWord);
+            }
+        }
+
+        private static bool SetUiEffects(bool enabled)
+        {
+            return SystemParametersInfo(SpiSetUiEffects, (uint)(enabled ? 1 : 0), IntPtr.Zero,
+                SpifUpdateIniFile | SpifSendChange);
+        }
+
+        private static void RestoreUiEffects()
+        {
+            int enabled = 1;
+            using (RegistryKey backup = Registry.CurrentUser.OpenSubKey(VisualEffectsBackup))
+            {
+                if (backup != null && Convert.ToInt32(backup.GetValue("Captured", 0), CultureInfo.InvariantCulture) == 1)
+                    enabled = Convert.ToInt32(backup.GetValue("Enabled", 1), CultureInfo.InvariantCulture) != 0 ? 1 : 0;
+            }
+            if (!SystemParametersInfo(SpiSetUiEffects, (uint)enabled, IntPtr.Zero, SpifUpdateIniFile | SpifSendChange))
+                throw new InvalidOperationException("параметр реестра восстановлен, но Windows не приняла исходное состояние эффектов");
+        }
+
+        private static void RestoreVisualEffects(RegItem item)
+        {
+            if (!RestoreRegistryValue(item))
+                WriteValue(item.Machine, item.Path, item.Value, item.Off);
+            RestoreUiEffects();
+            DeleteRegistryBackup(item);
+            DeleteUiEffectsBackup();
+        }
+
+        private static void DeleteUiEffectsBackup()
+        {
+            try { Registry.CurrentUser.DeleteSubKeyTree(VisualEffectsBackup, false); }
+            catch (Exception) { }
         }
 
         private static Tweak Reg(string group, string name, string hint, bool admin, bool signOut,
@@ -641,6 +763,7 @@ namespace CacheTrim
             return result.ExitCode;
         }
 
+        private const uint SpiGetUiEffects = 0x103E;
         private const uint SpiSetUiEffects = 0x103F;
         private const uint SpifUpdateIniFile = 0x01;
         private const uint SpifSendChange = 0x02;

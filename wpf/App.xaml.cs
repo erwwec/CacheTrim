@@ -52,7 +52,7 @@ public partial class App : Application
             }
         }
         catch { }
-        LogAdded?.Invoke(line);
+        try { LogAdded?.Invoke(line); } catch (Exception) { }
     }
 
     private static void TrimHistory()

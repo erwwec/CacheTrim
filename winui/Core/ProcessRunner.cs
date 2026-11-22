@@ -40,11 +40,19 @@ namespace CacheTrim
                 if (timedOut)
                 {
                     try { process.Kill(true); }
-                    catch (Exception) { }
-                    process.WaitForExit();
+                    catch (Exception)
+                    {
+                        try { process.Kill(); }
+                        catch (Exception) { }
+                    }
+                    process.WaitForExit(5000);
                 }
 
-                try { Task.WaitAll(stdout, stderr); }
+                try
+                {
+                    if (timedOut) Task.WaitAll(new Task[] { stdout, stderr }, 5000);
+                    else Task.WaitAll(stdout, stderr);
+                }
                 catch (AggregateException) { }
 
                 string output = (stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty) +

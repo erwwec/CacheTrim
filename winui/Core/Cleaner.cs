@@ -232,8 +232,10 @@ namespace CacheTrim
             }
             finally
             {
-                if (restartWua) StartService("wuauserv");
-                if (restartBits) StartService("bits");
+                if (restartWua)
+                    LogServiceRestartFailure("wuauserv", StartService("wuauserv"), _log);
+                if (restartBits)
+                    LogServiceRestartFailure("bits", StartService("bits"), _log);
             }
 
             _log("  " + FormatBytes(_bytes - before));
@@ -342,9 +344,7 @@ namespace CacheTrim
                             continue;
 
                         long length = info.Length;
-                        if ((info.Attributes & FileAttributes.ReadOnly) != 0)
-                            info.Attributes = FileAttributes.Normal;
-                        info.Delete();
+                        DeleteFilePreservingAttributes(info);
                         _bytes += length;
                         _files++;
                     }
@@ -408,14 +408,34 @@ namespace CacheTrim
                     return;
 
                 long length = info.Length;
-                info.Attributes = FileAttributes.Normal;
-                info.Delete();
+                DeleteFilePreservingAttributes(info);
                 _bytes += length;
                 _files++;
             }
             catch (Exception)
             {
                 _skipped++;
+            }
+        }
+
+        private static void DeleteFilePreservingAttributes(FileInfo info)
+        {
+            FileAttributes originalAttributes = info.Attributes;
+            try
+            {
+                if ((originalAttributes & FileAttributes.ReadOnly) != 0)
+                    info.Attributes = originalAttributes & ~FileAttributes.ReadOnly;
+                info.Delete();
+            }
+            catch
+            {
+                try
+                {
+                    if (File.Exists(info.FullName))
+                        File.SetAttributes(info.FullName, originalAttributes);
+                }
+                catch (Exception) { }
+                throw;
             }
         }
 
@@ -544,22 +564,32 @@ namespace CacheTrim
             }
         }
 
-        private static void StartService(string name)
+        private static string StartService(string name)
         {
             try
             {
                 using (ServiceController sc = new ServiceController(name))
                 {
                     if (sc.Status == ServiceControllerStatus.Running)
-                        return;
+                        return null;
+                    if (sc.Status != ServiceControllerStatus.Stopped)
+                        return "служба занята другой операцией";
 
                     sc.Start();
                     sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(12));
+                    return sc.Status == ServiceControllerStatus.Running ? null : "служба не запустилась";
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                return ex.Message;
             }
+        }
+
+        internal static void LogServiceRestartFailure(string name, string error, Action<string> log)
+        {
+            if (error != null)
+                log("  не удалось перезапустить службу " + name + ": " + error);
         }
 
         // ---------------- formatting ----------------

@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private bool _busy;
     private bool _suppressColor;
     private bool _suppressTweakEvents;
+    private bool _suppressAutostartEvents;
     private string _optimizationModule = "Windows";
     private StackPanel? _pageContent;
     private System.Windows.Controls.Panel? _pageCards;
@@ -756,16 +757,59 @@ public partial class MainWindow : Window
         if (_suppressTweakEvents) return;
         if (tweak.PotentiallyRisky && desired && !ConfirmRisk(tweak.Name, tweak.Hint))
         {
-            _suppressTweakEvents = true;
-            check.IsChecked = false;
-            _suppressTweakEvents = false;
+            SetCheckSilently(check, !desired, true);
             return;
         }
+        if (_busy)
+        {
+            SetCheckSilently(check, !desired, true);
+            SetStatus("дождитесь завершения текущей операции");
+            return;
+        }
+
+        _busy = true;
         check.IsEnabled = false;
-        string? error = await Task.Run(() => tweak.Set(desired));
-        check.IsEnabled = true;
-        if (error != null) { check.IsChecked = !desired; MessageBox.Show(this, error, "Не удалось применить", MessageBoxButton.OK, MessageBoxImage.Warning); App.Log("ошибка твика " + tweak.Name + ": " + error); }
-        else App.Log((desired ? "включён твик: " : "отключён твик: ") + tweak.Name + (tweak.NeedsSignOut ? " · нужен выход из системы" : string.Empty));
+        SetStatus(desired ? "применяются настройки…" : "возвращаются настройки…");
+        try
+        {
+            string? error = await Task.Run(() => tweak.Set(desired));
+            if (error != null)
+            {
+                SetCheckSilently(check, !desired, true);
+                MessageBox.Show(this, error, "Не удалось применить", MessageBoxButton.OK, MessageBoxImage.Warning);
+                App.Log("ошибка твика " + tweak.Name + ": " + error);
+                SetStatus("настройка не изменена");
+            }
+            else
+            {
+                App.Log((desired ? "включён твик: " : "отключён твик: ") + tweak.Name + (tweak.NeedsSignOut ? " · нужен выход из системы" : string.Empty));
+                SetStatus("настройка применена");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetCheckSilently(check, !desired, true);
+            App.Log("ошибка твика " + tweak.Name + ": " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Не удалось применить", MessageBoxButton.OK, MessageBoxImage.Warning);
+            SetStatus("настройка не изменена");
+        }
+        finally
+        {
+            check.IsEnabled = true;
+            _busy = false;
+        }
+    }
+
+    private void SetCheckSilently(CheckBox check, bool value, bool tweak)
+    {
+        if (tweak) _suppressTweakEvents = true;
+        else _suppressAutostartEvents = true;
+        try { check.IsChecked = value; }
+        finally
+        {
+            if (tweak) _suppressTweakEvents = false;
+            else _suppressAutostartEvents = false;
+        }
     }
 
     private void ShowAdvanced()
@@ -1013,9 +1057,13 @@ public partial class MainWindow : Window
         string target = highPerformance ? "Высокая производительность" : "Сбалансированный";
         if (!ConfirmRisk("План питания", "Переключить Windows на план «" + target + "»? Высокая производительность может повысить нагрев и расход батареи. Вернуться к сбалансированному плану можно в CacheTrim.")) return;
         Tweak tweak = Tweaks.All().First(item => item.Name == "План «Высокая производительность»");
-        string? error = await Task.Run(() => tweak.Set(highPerformance));
-        if (error != null) MessageBox.Show(this, error, "Не удалось изменить план питания", MessageBoxButton.OK, MessageBoxImage.Warning);
-        else { SetStatus("план питания: " + target); App.Log("план питания переключён: " + target); }
+        await RunBusyAsync("меняется план питания…", async () =>
+        {
+            string? error = await Task.Run(() => tweak.Set(highPerformance));
+            if (error != null) throw new InvalidOperationException(error);
+            SetStatus("план питания: " + target);
+            App.Log("план питания переключён: " + target);
+        });
     }
 
     private void ShowStartup()
@@ -1027,8 +1075,8 @@ public partial class MainWindow : Window
         foreach (Autostart.Entry entry in entries)
         {
             CheckBox check = new() { IsChecked = entry.Enabled, VerticalAlignment = VerticalAlignment.Center };
-            check.Checked += async (_, _) => await SetAutostartAsync(entry, check, true);
-            check.Unchecked += async (_, _) => await SetAutostartAsync(entry, check, false);
+            check.Checked += async (_, _) => { if (!_suppressAutostartEvents) await SetAutostartAsync(entry, check, true); };
+            check.Unchecked += async (_, _) => { if (!_suppressAutostartEvents) await SetAutostartAsync(entry, check, false); };
             string state = entry.Enabled ? string.Empty : " · отключено, запись в резерве";
             rows.Children.Add(Row(entry.Name, Autostart.SourceLabel(entry.Origin) + " · " + Ellipsize(entry.Command, 110) + state + (entry.RequiresAdmin ? " · админ" : string.Empty), check));
         }
@@ -1041,11 +1089,46 @@ public partial class MainWindow : Window
 
     private async Task SetAutostartAsync(Autostart.Entry entry, CheckBox check, bool enabled)
     {
+        if (_suppressAutostartEvents) return;
+        if (_busy)
+        {
+            SetCheckSilently(check, !enabled, false);
+            SetStatus("дождитесь завершения текущей операции");
+            return;
+        }
+
+        _busy = true;
         check.IsEnabled = false;
-        string? error = await Task.Run(() => Autostart.SetEnabled(entry, enabled));
-        check.IsEnabled = true;
-        if (error != null) { check.IsChecked = !enabled; MessageBox.Show(this, error, "Не удалось изменить автозагрузку", MessageBoxButton.OK, MessageBoxImage.Warning); }
-        else { entry.Enabled = enabled; App.Log((enabled ? "восстановлена автозагрузка: " : "отключена автозагрузка: ") + entry.Name); }
+        SetStatus(enabled ? "восстанавливается автозагрузка…" : "отключается автозагрузка…");
+        try
+        {
+            string? error = await Task.Run(() => Autostart.SetEnabled(entry, enabled));
+            if (error != null)
+            {
+                SetCheckSilently(check, !enabled, false);
+                MessageBox.Show(this, error, "Не удалось изменить автозагрузку", MessageBoxButton.OK, MessageBoxImage.Warning);
+                App.Log("ошибка автозагрузки " + entry.Name + ": " + error);
+                SetStatus("автозагрузка не изменена");
+            }
+            else
+            {
+                entry.Enabled = enabled;
+                App.Log((enabled ? "восстановлена автозагрузка: " : "отключена автозагрузка: ") + entry.Name);
+                SetStatus("автозагрузка обновлена");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetCheckSilently(check, !enabled, false);
+            App.Log("ошибка автозагрузки " + entry.Name + ": " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Не удалось изменить автозагрузку", MessageBoxButton.OK, MessageBoxImage.Warning);
+            SetStatus("автозагрузка не изменена");
+        }
+        finally
+        {
+            check.IsEnabled = true;
+            _busy = false;
+        }
     }
 
     private void ShowLog()
@@ -1222,41 +1305,62 @@ public partial class MainWindow : Window
 
     private async Task CheckUpdatesAsync()
     {
+        if (_busy)
+        {
+            SetStatus("сначала дождитесь завершения текущей операции");
+            return;
+        }
+        _busy = true;
         SetStatus("проверяю GitHub Releases…");
         try
         {
             UpdateInfo info = await Task.Run(UpdateService.CheckLatest);
             if (!info.Available) { MessageBox.Show(this, "Установлена последняя версия CacheTrim " + AppInfo.Version + ".", "Обновлений нет", MessageBoxButton.OK, MessageBoxImage.Information); SetStatus("установлена последняя версия"); return; }
-            if (Confirm("Доступно обновление " + info.Version, "Скачать проверенную SHA-256 сборку и перезапустить CacheTrim?"))
+            if (!Confirm("Доступно обновление " + info.Version, "Скачать проверенную SHA-256 сборку и перезапустить CacheTrim?"))
             {
-                SetStatus("скачиваю и проверяю обновление " + info.Version + "…");
-                string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-                await Task.Run(() => UpdateService.DownloadAndLaunch(info, exe, Environment.ProcessId));
-                System.Windows.Application.Current.Shutdown();
+                SetStatus("обновление отложено");
+                return;
             }
+            SetStatus("скачиваю и проверяю обновление " + info.Version + "…");
+            string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
+            await Task.Run(() => UpdateService.DownloadAndLaunch(info, exe, Environment.ProcessId));
+            System.Windows.Application.Current.Shutdown();
         }
         catch (Exception ex) { SetStatus("ошибка проверки обновления"); MessageBox.Show(this, ex.Message, "Не удалось проверить обновления", MessageBoxButton.OK, MessageBoxImage.Error); }
+        finally { _busy = false; }
     }
 
     private async Task SetScheduledCleanAsync(bool enabled)
     {
         string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-        string? error = await Task.Run(() => enabled ? TaskSetup.Install(exe, _settings.DelaySeconds) : TaskSetup.Uninstall());
-        if (error != null) MessageBox.Show(this, error, "Не удалось изменить задачу", MessageBoxButton.OK, MessageBoxImage.Warning);
-        else { SetStatus(enabled ? "автоочистка при входе включена" : "автоочистка при входе отключена"); App.Log(enabled ? "задача автоочистки включена" : "задача автоочистки снята"); }
+        await RunBusyAsync(enabled ? "включается автоочистка…" : "снимается задача автоочистки…", async () =>
+        {
+            string? error = await Task.Run(() => enabled ? TaskSetup.Install(exe, _settings.DelaySeconds) : TaskSetup.Uninstall());
+            if (error != null) throw new InvalidOperationException(error);
+            SetStatus(enabled ? "автоочистка при входе включена" : "автоочистка при входе отключена");
+            App.Log(enabled ? "задача автоочистки включена" : "задача автоочистки снята");
+        });
     }
 
     private async Task ShowDiagnosticsAsync()
     {
-        Native.MemStats s = await Task.Run(Native.GetMemoryStats);
-        string disks = string.Join(Environment.NewLine, DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed).Select(d => d.Name + "  " + Cleaner.FormatBytes(d.AvailableFreeSpace) + " свободно из " + Cleaner.FormatBytes(d.TotalSize)));
-        string report = "Windows " + Environment.OSVersion.Version + " · " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit") +
-            "\nПроцессоры: " + Environment.ProcessorCount + "\nПроцессы: " + s.ProcessCount + " · Дескрипторы: " + s.HandleCount +
-            "\nОЗУ: " + Cleaner.FormatBytes((long)s.TotalPhys) + " всего · " + Cleaner.FormatBytes((long)s.AvailPhys) + " доступно" +
-            "\nStandby: " + Cleaner.FormatBytes((long)s.Standby) + " · кэш: " + Cleaner.FormatBytes((long)s.Cache) + "\n\nДИСКИ\n" + disks +
-            "\n\nЗадача автоочистки: " + (TaskSetup.IsInstalled() ? "включена" : "выключена") + "\nПрава администратора: " + (Native.IsElevated ? "есть" : "нет");
-        MessageBox.Show(this, report, "Диагностика системы", MessageBoxButton.OK, MessageBoxImage.Information);
-        App.Log("сформирован диагностический отчёт");
+        try
+        {
+            Native.MemStats s = await Task.Run(Native.GetMemoryStats);
+            string disks = string.Join(Environment.NewLine, DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed).Select(d => d.Name + "  " + Cleaner.FormatBytes(d.AvailableFreeSpace) + " свободно из " + Cleaner.FormatBytes(d.TotalSize)));
+            string report = "Windows " + Environment.OSVersion.Version + " · " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit") +
+                "\nПроцессоры: " + Environment.ProcessorCount + "\nПроцессы: " + s.ProcessCount + " · Дескрипторы: " + s.HandleCount +
+                "\nОЗУ: " + Cleaner.FormatBytes((long)s.TotalPhys) + " всего · " + Cleaner.FormatBytes((long)s.AvailPhys) + " доступно" +
+                "\nStandby: " + Cleaner.FormatBytes((long)s.Standby) + " · кэш: " + Cleaner.FormatBytes((long)s.Cache) + "\n\nДИСКИ\n" + disks +
+                "\n\nЗадача автоочистки: " + (TaskSetup.IsInstalled() ? "включена" : "выключена") + "\nПрава администратора: " + (Native.IsElevated ? "есть" : "нет");
+            MessageBox.Show(this, report, "Диагностика системы", MessageBoxButton.OK, MessageBoxImage.Information);
+            App.Log("сформирован диагностический отчёт");
+        }
+        catch (Exception ex)
+        {
+            App.Log("ошибка диагностики: " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Не удалось выполнить диагностику", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OpenWindowsSettings(string uri)
@@ -1279,12 +1383,21 @@ public partial class MainWindow : Window
 
     private void OnLogAdded(string line)
     {
-        Dispatcher.BeginInvoke(() =>
+        try
         {
-            if (_activePage != "log" || _logBox == null) return;
-            _logBox.AppendText(line + Environment.NewLine);
-            _logBox.ScrollToEnd();
-        });
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (!IsLoaded || Dispatcher.HasShutdownStarted || _activePage != "log" || _logBox == null) return;
+                    _logBox.AppendText(line + Environment.NewLine);
+                    _logBox.ScrollToEnd();
+                }
+                catch (Exception) { }
+            }));
+        }
+        catch (Exception) { }
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
