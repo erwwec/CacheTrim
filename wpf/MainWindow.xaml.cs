@@ -850,6 +850,9 @@ public partial class MainWindow : Window
         checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
         modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
 
+        modules.Children.Add(AdvancedModule("ОТЧЁТ ДЛЯ ПОМОЩИ", "Сохранит сводку Windows, памяти, дисков и включённых настроек CacheTrim. Отчёт остаётся на этом компьютере, личные пути и список программ не добавляются.",
+            AdvancedButton("Сохранить системный отчёт", async () => await ExportSystemReportAsync())));
+
         _pageContent!.Children.Add(modules);
     }
 
@@ -1364,6 +1367,49 @@ public partial class MainWindow : Window
             App.Log("ошибка диагностики: " + ex.Message);
             MessageBox.Show(this, ex.Message, "Не удалось выполнить диагностику", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private async Task ExportSystemReportAsync()
+    {
+        await RunBusyAsync("собирается системный отчёт…", async () =>
+        {
+            Native.MemStats memory = await Task.Run(Native.GetMemoryStats);
+            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (string.IsNullOrWhiteSpace(documents))
+                documents = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string reportFolder = Path.Combine(documents, "CacheTrim", "Reports");
+            Directory.CreateDirectory(reportFolder);
+            string reportPath = Path.Combine(reportFolder, "CacheTrim-report-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".txt");
+            List<string> activeTweaks = await Task.Run(() => Tweaks.All().Where(item => item.IsOn()).Select(item => "- " + item.Name).ToList());
+            List<string> disks = new();
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (drive.IsReady && drive.DriveType == DriveType.Fixed)
+                        disks.Add("- " + drive.Name.TrimEnd('\\', ':') + ": " + Cleaner.FormatBytes(drive.AvailableFreeSpace) + " свободно из " + Cleaner.FormatBytes(drive.TotalSize));
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            string report = "CacheTrim — системный отчёт\r\n" +
+                "Создан: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n" +
+                "Версия CacheTrim: " + AppInfo.Version + "\r\n" +
+                "Windows: " + Environment.OSVersion.Version + "\r\n" +
+                "Разрядность Windows: " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit") + "\r\n" +
+                "Логических процессоров: " + Environment.ProcessorCount + "\r\n" +
+                "Память: " + Cleaner.FormatBytes((long)memory.TotalPhys) + " всего; " + Cleaner.FormatBytes((long)memory.AvailPhys) + " доступно; " + Cleaner.FormatBytes((long)(memory.TotalPhys > memory.AvailPhys ? memory.TotalPhys - memory.AvailPhys : 0)) + " занято\r\n" +
+                "Запущено процессов: " + memory.ProcessCount + "\r\n" +
+                "Права администратора: " + (Native.IsElevated ? "есть" : "нет") + "\r\n" +
+                "Автоочистка при входе: " + (TaskSetup.IsInstalled() ? "включена" : "выключена") + "\r\n\r\n" +
+                "ДИСКИ\r\n" + (disks.Count == 0 ? "Нет доступных фиксированных дисков." : string.Join("\r\n", disks)) + "\r\n\r\n" +
+                "ВКЛЮЧЁННЫЕ НАСТРОЙКИ CACHETRIM\r\n" + (activeTweaks.Count == 0 ? "Нет включённых настроек." : string.Join("\r\n", activeTweaks)) + "\r\n";
+            File.WriteAllText(reportPath, report, new System.Text.UTF8Encoding(false));
+            App.Log("сохранён системный отчёт без списка программ и личных путей");
+            MessageBoxResult result = MessageBox.Show(this, "Отчёт сохранён:\n" + reportPath + "\n\nОткрыть папку с отчётом?", "Системный отчёт готов", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (result == MessageBoxResult.Yes) OpenPath(reportFolder);
+            SetStatus("системный отчёт сохранён");
+        });
     }
 
     private void OpenWindowsSettings(string uri)
