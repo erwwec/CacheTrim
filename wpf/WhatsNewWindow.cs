@@ -4,16 +4,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using UiButton = Wpf.Ui.Controls.Button;
+using MediaBrush = System.Windows.Media.Brush;
 
 namespace CacheTrim;
 
 internal sealed class WhatsNewWindow : Window
 {
-    private static readonly Brush BackgroundBrush = new SolidColorBrush(Color.FromRgb(17, 21, 27));
-    private static readonly Brush CardBrush = new SolidColorBrush(Color.FromRgb(27, 33, 41));
-    private static readonly Brush TextBrush = new SolidColorBrush(Color.FromRgb(238, 243, 249));
-    private static readonly Brush MutedBrush = new SolidColorBrush(Color.FromRgb(159, 174, 191));
-    private static readonly Brush AccentBrush = new SolidColorBrush(Color.FromRgb(139, 196, 255));
+    private static readonly MediaBrush BackgroundBrush = new SolidColorBrush(Color.FromRgb(17, 21, 27));
+    private static readonly MediaBrush CardBrush = new SolidColorBrush(Color.FromRgb(27, 33, 41));
+    private static readonly MediaBrush TextBrush = new SolidColorBrush(Color.FromRgb(238, 243, 249));
+    private static readonly MediaBrush MutedBrush = new SolidColorBrush(Color.FromRgb(159, 174, 191));
+    private static readonly MediaBrush AccentBrush = new SolidColorBrush(Color.FromRgb(139, 196, 255));
 
     public WhatsNewWindow(string previousVersion, string currentVersion, string notes)
     {
