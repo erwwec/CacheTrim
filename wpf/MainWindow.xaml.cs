@@ -1377,9 +1377,9 @@ public partial class MainWindow : Window
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             if (string.IsNullOrWhiteSpace(documents))
                 documents = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string reportFolder = Path.Combine(documents, "CacheTrim", "Reports");
+            string reportFolder = System.IO.Path.Combine(documents, "CacheTrim", "Reports");
             Directory.CreateDirectory(reportFolder);
-            string reportPath = Path.Combine(reportFolder, "CacheTrim-report-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".txt");
+            string reportPath = System.IO.Path.Combine(reportFolder, "CacheTrim-report-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".txt");
             List<string> activeTweaks = await Task.Run(() => Tweaks.All().Where(item => item.IsOn()).Select(item => "- " + item.Name).ToList());
             List<string> disks = new();
             foreach (DriveInfo drive in DriveInfo.GetDrives())
