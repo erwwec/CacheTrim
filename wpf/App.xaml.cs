@@ -26,14 +26,19 @@ public partial class App : Application
             return;
         }
         int page = 0;
+        string updatedFrom = null;
         foreach (string argument in e.Args)
         {
             if (argument.StartsWith("--page=", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(argument.Substring(7), out int parsed)) page = Math.Max(0, Math.Min(6, parsed));
+                int.TryParse(argument.Substring(7), out int parsed)) page = Math.Max(0, Math.Min(7, parsed));
+            if (argument.StartsWith("--updated-from=", StringComparison.OrdinalIgnoreCase))
+                updatedFrom = argument.Substring("--updated-from=".Length);
         }
         MainWindow window = new(page);
         MainWindow = window;
         window.Show();
+        if (!string.IsNullOrWhiteSpace(updatedFrom))
+            window.ShowWhatsNew(updatedFrom);
     }
 
     internal static void Log(string message)

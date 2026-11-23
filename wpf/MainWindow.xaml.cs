@@ -72,7 +72,7 @@ public partial class MainWindow : Window
         _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         _memoryTimer.Tick += delegate { RefreshMemory(); };
         _memoryTimer.Start();
-        string[] pages = { "memory", "clean", "optimize", "startup", "log", "settings", "advanced" };
+        string[] pages = { "memory", "clean", "optimize", "startup", "log", "settings", "advanced", "pet" };
         Navigate(pages[Math.Max(0, Math.Min(pages.Length - 1, startPage))]);
         RefreshMemory();
     }
@@ -137,6 +137,7 @@ public partial class MainWindow : Window
         AddNav("Очистка", "◇", "clean");
         AddNav("Оптимизация", "⚙", "optimize");
         AddNav("Расширенные", "⚡", "advanced");
+        AddNav("Питомец", "◆", "pet");
         AddNav("Автозагрузка", "⏻", "startup");
         AddNav("Журнал", "≡", "log");
         AddNav("Настройки", "⚙", "settings");
@@ -174,6 +175,7 @@ public partial class MainWindow : Window
             case "clean": ShowClean(); break;
             case "optimize": ShowOptimize(); break;
             case "advanced": ShowAdvanced(); break;
+            case "pet": ShowPet(); break;
             case "startup": ShowStartup(); break;
             case "log": ShowLog(); break;
             case "settings": ShowSettings(); break;
@@ -854,6 +856,63 @@ public partial class MainWindow : Window
             AdvancedButton("Сохранить системный отчёт", async () => await ExportSystemReportAsync())));
 
         _pageContent!.Children.Add(modules);
+    }
+
+    private void ShowPet()
+    {
+        BeginPage("Питомец рабочего стола", "Запускай Клода прямо из CacheTrim — питомец остаётся поверх рабочего стола и окон.");
+        WrapPanel cards = new();
+        cards.Children.Add(AdvancedModule("DESKTOP PET", "При первом запуске CacheTrim скачает питомца из GitHub и проверит файл по SHA-256. Затем Клод появится на рабочем столе отдельным прозрачным окном.",
+            AdvancedButton("Запустить питомца", async () => await LaunchDesktopPetAsync(), true)));
+        cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ ПИТОМЦЕМ", "Перетаскивай Клода левой кнопкой мыши. Нажми правой кнопкой по нему, чтобы открыть меню: там настраиваются размер, реплики, режим «Не отвлекать», коллекция и реакция на звук. Клик по спящему питомцу его разбудит.",
+            AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync())));
+        _pageContent!.Children.Add(cards);
+    }
+
+    private async Task LaunchDesktopPetAsync()
+    {
+        if (System.Diagnostics.Process.GetProcessesByName("DesktopPet").Length > 0)
+        {
+            MessageBox.Show(this, "Питомец уже запущен. Найди его на рабочем столе или нажми по нему правой кнопкой, чтобы открыть настройки.", "Desktop Pet", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        await RunBusyAsync("проверяется и запускается питомец…", async () =>
+        {
+            UpdateInfo release = await Task.Run(UpdateService.CheckLatest);
+            if (string.IsNullOrWhiteSpace(release.DesktopPetDownloadUrl) || string.IsNullOrWhiteSpace(release.DesktopPetChecksumUrl))
+                throw new InvalidOperationException("В последнем GitHub-релизе пока нет файла Desktop Pet. Проверь подключение и повтори попытку позже.");
+            string petPath = await Task.Run(() => UpdateService.EnsureDesktopPet(release));
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(petPath) { UseShellExecute = true });
+            App.Log("Desktop Pet проверен и запущен из вкладки CacheTrim");
+        });
+    }
+
+    private Task ShowPetHelpAsync()
+    {
+        MessageBox.Show(this,
+            "Клод — отдельный питомец рабочего стола, поэтому он остаётся виден, когда CacheTrim свёрнут.\n\n" +
+            "• Перетащи его левой кнопкой.\n" +
+            "• Нажми правой кнопкой, чтобы открыть настройки.\n" +
+            "• Нажми на спящего Клода, чтобы разбудить.\n\n" +
+            "Параметры питомца хранятся отдельно от настроек CacheTrim.",
+            "Управление Desktop Pet", MessageBoxButton.OK, MessageBoxImage.Information);
+        return Task.CompletedTask;
+    }
+
+    internal void ShowWhatsNew(string previousVersion)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            string notesPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CacheTrim", "UpdateCache", "WhatsNew.txt");
+            string notes = string.Empty;
+            try { if (File.Exists(notesPath)) notes = File.ReadAllText(notesPath, new System.Text.UTF8Encoding(false)); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            WhatsNewWindow window = new(previousVersion, AppInfo.Version, notes) { Owner = this };
+            window.ShowDialog();
+            App.Log("показано окно изменений после обновления " + previousVersion + " → " + AppInfo.Version);
+        }), DispatcherPriority.ApplicationIdle);
     }
 
     private Border AdvancedModule(string title, string description, params FrameworkElement[] actions)

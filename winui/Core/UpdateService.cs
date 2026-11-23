@@ -15,6 +15,9 @@ internal sealed class UpdateInfo
     public string ReleaseUrl { get; init; } = string.Empty;
     public string DownloadUrl { get; init; } = string.Empty;
     public string ChecksumUrl { get; init; } = string.Empty;
+    public string DesktopPetDownloadUrl { get; init; } = string.Empty;
+    public string DesktopPetChecksumUrl { get; init; } = string.Empty;
+    public string ReleaseNotes { get; init; } = string.Empty;
     public bool Available { get; init; }
 }
 
@@ -24,6 +27,7 @@ internal static class UpdateService
 
     static UpdateService()
     {
+        Client.Timeout = TimeSpan.FromMinutes(20);
         Client.DefaultRequestHeaders.UserAgent.ParseAdd("CacheTrim/" + AppInfo.Version);
     }
 
@@ -44,12 +48,16 @@ internal static class UpdateService
 
         string exeUrl = string.Empty;
         string hashUrl = string.Empty;
+        string petUrl = string.Empty;
+        string petHashUrl = string.Empty;
         foreach (JsonElement asset in release.GetProperty("assets").EnumerateArray())
         {
             string name = asset.GetProperty("name").GetString() ?? string.Empty;
             string url = asset.GetProperty("browser_download_url").GetString() ?? string.Empty;
             if (name == "CacheTrim.exe") exeUrl = url;
             if (name == "CacheTrim.exe.sha256") hashUrl = url;
+            if (name == "DesktopPet.exe") petUrl = url;
+            if (name == "DesktopPet.exe.sha256") petHashUrl = url;
         }
 
         bool available = latestVersion > currentVersion;
@@ -62,6 +70,9 @@ internal static class UpdateService
             ReleaseUrl = release.GetProperty("html_url").GetString() ?? string.Empty,
             DownloadUrl = exeUrl,
             ChecksumUrl = hashUrl,
+            DesktopPetDownloadUrl = petUrl,
+            DesktopPetChecksumUrl = petHashUrl,
+            ReleaseNotes = release.TryGetProperty("body", out JsonElement body) ? body.GetString() ?? string.Empty : string.Empty,
             Available = available
         };
     }
@@ -143,6 +154,8 @@ internal static class UpdateService
         File.WriteAllText(checksumFile, actual, Encoding.ASCII);
         string scriptPath = Path.Combine(updateRoot, "ApplyUpdate.ps1");
         string logPath = Path.Combine(updateRoot, "ApplyUpdate.log");
+        string notesPath = Path.Combine(updateRoot, "WhatsNew.txt");
+        File.WriteAllText(notesPath, update.ReleaseNotes ?? string.Empty, new UTF8Encoding(false));
         StringBuilder script = new();
         script.AppendLine("$ErrorActionPreference = 'Stop'");
         // Do not name this PowerShell variable $processId: variable names are case-insensitive,
@@ -164,7 +177,7 @@ internal static class UpdateService
         script.AppendLine("  $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()");
         script.AppendLine("  if ($actualHash -ne $expectedHash) { throw 'Проверка установленного файла не прошла.' }");
         script.AppendLine("  Add-Content -LiteralPath $log -Value 'Update installed and verified.' -Encoding UTF8");
-        script.AppendLine("  Start-Process -FilePath $target");
+        script.AppendLine("  Start-Process -FilePath $target -ArgumentList " + PowerShellLiteral("--updated-from=" + AppInfo.Version));
         script.AppendLine("} catch {");
         script.AppendLine("  Add-Content -LiteralPath $log -Value ('UPDATE FAILED: ' + $_.Exception.Message) -Encoding UTF8");
         script.AppendLine("  if ($backupCreated -and (Test-Path -LiteralPath $backup)) {");
@@ -185,6 +198,74 @@ internal static class UpdateService
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden
         }) ?? throw new InvalidOperationException("Не удалось запустить установщик обновления.");
+    }
+
+    public static string EnsureDesktopPet(UpdateInfo update)
+    {
+        if (update is null)
+            throw new ArgumentNullException(nameof(update));
+        RequireGitHubUrl(update.DesktopPetDownloadUrl);
+        RequireGitHubUrl(update.DesktopPetChecksumUrl);
+
+        string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CacheTrim", "Companion");
+        Directory.CreateDirectory(directory);
+        string target = Path.Combine(directory, "DesktopPet.exe");
+        string staged = target + ".download";
+        string expected = Client.GetStringAsync(update.DesktopPetChecksumUrl).GetAwaiter().GetResult()
+            .Trim().Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+        if (expected.Length != 64 || expected.Any(c => !Uri.IsHexDigit(c)))
+            throw new InvalidDataException("Контрольная сумма питомца в GitHub Release имеет неверный формат.");
+
+        if (File.Exists(target))
+        {
+            using (FileStream current = File.OpenRead(target))
+            using (SHA256 sha = SHA256.Create())
+            {
+                string currentHash = BitConverter.ToString(sha.ComputeHash(current)).Replace("-", string.Empty).ToLowerInvariant();
+                if (string.Equals(currentHash, expected, StringComparison.OrdinalIgnoreCase))
+                    return target;
+            }
+        }
+
+        try
+        {
+            using HttpResponseMessage response = Client.GetAsync(update.DesktopPetDownloadUrl, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength.Value > 300L * 1024 * 1024)
+                throw new InvalidDataException("Файл питомца превышает допустимый размер.");
+            using (Stream source = response.Content.ReadAsStream())
+            using (FileStream output = new(staged, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 256))
+            using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
+            {
+                byte[] buffer = new byte[1024 * 256];
+                int read;
+                long total = 0;
+                while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > 300L * 1024 * 1024)
+                        throw new InvalidDataException("Файл питомца превышает допустимый размер.");
+                    output.Write(buffer, 0, read);
+                    hash.AppendData(buffer, 0, read);
+                }
+                output.Flush(true);
+                string actual = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+                if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Контрольная сумма питомца не совпала.");
+            }
+            using (FileStream check = File.OpenRead(staged))
+            {
+                if (check.ReadByte() != 'M' || check.ReadByte() != 'Z')
+                    throw new InvalidDataException("Скачанный файл питомца не является приложением Windows.");
+            }
+            File.Copy(staged, target, true);
+            return target;
+        }
+        finally
+        {
+            try { if (File.Exists(staged)) File.Delete(staged); }
+            catch { }
+        }
     }
 
     private static void RequireGitHubUrl(string value)
