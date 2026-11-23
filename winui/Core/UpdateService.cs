@@ -133,6 +133,13 @@ internal static class UpdateService
             throw new InvalidDataException("Контрольная сумма обновления не совпала.");
         }
 
+        string binaryVersion = FileVersionInfo.GetVersionInfo(stagedExe).FileVersion;
+        if (!ReleaseVersionGuard.Matches(update.Version, binaryVersion))
+        {
+            File.Delete(stagedExe);
+            throw new InvalidDataException("Версия скачанного CacheTrim не совпадает с версией релиза " + update.Version + ".");
+        }
+
         File.WriteAllText(checksumFile, actual, Encoding.ASCII);
         string scriptPath = Path.Combine(updateRoot, "ApplyUpdate.ps1");
         string logPath = Path.Combine(updateRoot, "ApplyUpdate.log");
@@ -160,8 +167,13 @@ internal static class UpdateService
         script.AppendLine("  Start-Process -FilePath $target");
         script.AppendLine("} catch {");
         script.AppendLine("  Add-Content -LiteralPath $log -Value ('UPDATE FAILED: ' + $_.Exception.Message) -Encoding UTF8");
-        script.AppendLine("  if ($backupCreated -and (Test-Path -LiteralPath $backup)) { Copy-Item -LiteralPath $backup -Destination $target -Force; Start-Process -FilePath $target }");
-        script.AppendLine("  try { (New-Object -ComObject WScript.Shell).Popup('Не удалось установить обновление CacheTrim. Старая версия сохранена. Подробности: ' + $log, 0, 'CacheTrim — обновление', 48) | Out-Null } catch { }");
+        script.AppendLine("  if ($backupCreated -and (Test-Path -LiteralPath $backup)) {");
+        script.AppendLine("    try { Copy-Item -LiteralPath $backup -Destination $target -Force -ErrorAction Stop; Start-Process -FilePath $target; Add-Content -LiteralPath $log -Value 'Previous version restored and started.' -Encoding UTF8 }");
+        script.AppendLine("    catch { Add-Content -LiteralPath $log -Value ('RESTORE FAILED: ' + $_.Exception.Message) -Encoding UTF8; try { (New-Object -ComObject WScript.Shell).Popup('Не удалось восстановить старую версию. Резервная копия находится здесь: ' + $backup + '. Подробности: ' + $log, 0, 'CacheTrim — ошибка восстановления', 16) | Out-Null } catch { } }");
+        script.AppendLine("  } else {");
+        script.AppendLine("    try { if (Test-Path -LiteralPath $target) { Start-Process -FilePath $target } } catch { }");
+        script.AppendLine("    try { (New-Object -ComObject WScript.Shell).Popup('Не удалось установить обновление CacheTrim. Текущий файл не был заменён. Подробности: ' + $log, 0, 'CacheTrim — обновление', 48) | Out-Null } catch { }");
+        script.AppendLine("  }");
         script.AppendLine("}");
         File.WriteAllText(scriptPath, script.ToString(), Encoding.Unicode);
 

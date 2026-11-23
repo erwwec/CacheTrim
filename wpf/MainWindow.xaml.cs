@@ -741,7 +741,7 @@ public partial class MainWindow : Window
                         Children =
                         {
                             Action("Высокая производительность", async () => await ApplyPowerPlanAsync(true), true),
-                            Action("Сбалансированный", async () => await ApplyPowerPlanAsync(false))
+                            Action("Восстановить прежний план", async () => await ApplyPowerPlanAsync(false))
                         }
                     }
                 }
@@ -839,9 +839,9 @@ public partial class MainWindow : Window
         modules.Children.Add(AdvancedModule("ОЧИСТИТЬ СИСТЕМНЫЕ КОМПОНЕНТЫ", "Удаляет устаревшие версии компонентов Windows после обновлений. После очистки нельзя будет удалить соответствующие старые обновления.",
             AdvancedAction("Удалить старые компоненты", "DISM удалит заменённые версии системных компонентов, чтобы освободить место. После этого нельзя будет удалить соответствующие старые обновления Windows. Операция может занять много времени.", "Очищаются старые компоненты Windows…", "Dism.exe", "/Online /Cleanup-Image /StartComponentCleanup", 2 * 60 * 60 * 1000)));
 
-        modules.Children.Add(AdvancedModule("ПРОИЗВОДИТЕЛЬНОСТЬ WINDOWS", "Высокая производительность уменьшает энергосбережение процессора. На ноутбуке быстрее расходуется заряд. Вернуть обычный режим можно этой же карточкой.",
+        modules.Children.Add(AdvancedModule("ПРОИЗВОДИТЕЛЬНОСТЬ WINDOWS", "Высокая производительность уменьшает энергосбережение процессора. На ноутбуке быстрее расходуется заряд. Вернуть прежний план можно этой же карточкой.",
             AdvancedButton("Включить высокую производительность", async () => await ApplyPowerPlanAsync(true), true),
-            AdvancedButton("Вернуть сбалансированный режим", async () => await ApplyPowerPlanAsync(false))));
+            AdvancedButton("Восстановить прежний план", async () => await ApplyPowerPlanAsync(false))));
 
         WrapPanel checks = new();
         checks.Children.Add(AdvancedAction("Проверить файлы Windows", "Проверит защищённые файлы и попробует восстановить повреждённые. Может занять несколько минут.", "Проверяются файлы Windows…", "sfc.exe", "/scannow", 30 * 60 * 1000));
@@ -885,7 +885,7 @@ public partial class MainWindow : Window
         string title = enabled ? "Игровой профиль" : "Стандартные настройки";
         string details = enabled
             ? "CacheTrim изменит план питания, включит игровой режим Windows, отключит фоновую запись клипов и системное ограничение CPU для фоновых задач. Ноутбук может сильнее нагреваться и быстрее разряжаться. Часть изменений потребует перезапуска Windows."
-            : "CacheTrim вернёт сбалансированный план питания, включит обратно параметры игровых записей и снимет изменения игрового профиля CacheTrim.";
+            : "CacheTrim восстановит прежний план питания, включит обратно параметры игровых записей и снимет изменения игрового профиля CacheTrim.";
         if (!ConfirmRisk(title, details)) return;
         await RunBusyAsync(enabled ? "включается игровой профиль…" : "возвращаются стандартные параметры…", async () =>
         {
@@ -1054,15 +1054,18 @@ public partial class MainWindow : Window
 
     private async Task ApplyPowerPlanAsync(bool highPerformance)
     {
-        string target = highPerformance ? "Высокая производительность" : "Сбалансированный";
-        if (!ConfirmRisk("План питания", "Переключить Windows на план «" + target + "»? Высокая производительность может повысить нагрев и расход батареи. Вернуться к сбалансированному плану можно в CacheTrim.")) return;
+        string target = highPerformance ? "Высокая производительность" : "прежний план питания";
+        string details = highPerformance
+            ? "Переключить Windows на план «Высокая производительность»? Он может повысить нагрев и расход батареи. CacheTrim сохранит текущий план и восстановит его по кнопке «Восстановить прежний план»."
+            : "CacheTrim восстановит план, который был активен до включения высокой производительности. Если резервная копия не найдена, будет выбран план «Сбалансированный».";
+        if (!ConfirmRisk("План питания", details)) return;
         Tweak tweak = Tweaks.All().First(item => item.Name == "План «Высокая производительность»");
         await RunBusyAsync("меняется план питания…", async () =>
         {
             string? error = await Task.Run(() => tweak.Set(highPerformance));
             if (error != null) throw new InvalidOperationException(error);
-            SetStatus("план питания: " + target);
-            App.Log("план питания переключён: " + target);
+            SetStatus(highPerformance ? "план питания: высокая производительность" : "прежний план питания восстановлен");
+            App.Log(highPerformance ? "план питания переключён: высокая производительность" : "прежний план питания восстановлен");
         });
     }
 

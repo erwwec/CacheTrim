@@ -619,10 +619,15 @@ namespace CacheTrim
                     int disableCode = Run(ScExe, "config \"" + serviceName + "\" start= disabled", out output);
                     if (disableCode != 0)
                     {
-                        if (wasRunning) StartServiceIfNeeded(serviceName);
-                        return "sc config " + serviceName + ": " + output;
-                    }
-                    return null;
+                        string configError = "sc config " + serviceName + ": " + output;
+                        if (wasRunning)
+                        {
+                            string startError = StartServiceIfNeeded(serviceName);
+                            if (startError != null)
+                                return configError + "; не удалось вернуть исходное состояние: " + startError;
+                        }
+                        return configError;
+                    }                    return null;
                 }
 
                 int startMode = stockStart;
