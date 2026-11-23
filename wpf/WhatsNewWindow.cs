@@ -5,16 +5,18 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using UiButton = Wpf.Ui.Controls.Button;
 using MediaBrush = System.Windows.Media.Brush;
+using MediaColor = System.Windows.Media.Color;
+using WpfOrientation = System.Windows.Controls.Orientation;
 
 namespace CacheTrim;
 
 internal sealed class WhatsNewWindow : Window
 {
-    private static readonly MediaBrush BackgroundBrush = new SolidColorBrush(Color.FromRgb(17, 21, 27));
-    private static readonly MediaBrush CardBrush = new SolidColorBrush(Color.FromRgb(27, 33, 41));
-    private static readonly MediaBrush TextBrush = new SolidColorBrush(Color.FromRgb(238, 243, 249));
-    private static readonly MediaBrush MutedBrush = new SolidColorBrush(Color.FromRgb(159, 174, 191));
-    private static readonly MediaBrush AccentBrush = new SolidColorBrush(Color.FromRgb(139, 196, 255));
+    private static readonly MediaBrush BackgroundBrush = new SolidColorBrush(MediaColor.FromRgb(17, 21, 27));
+    private static readonly MediaBrush CardBrush = new SolidColorBrush(MediaColor.FromRgb(27, 33, 41));
+    private static readonly MediaBrush TextBrush = new SolidColorBrush(MediaColor.FromRgb(238, 243, 249));
+    private static readonly MediaBrush MutedBrush = new SolidColorBrush(MediaColor.FromRgb(159, 174, 191));
+    private static readonly MediaBrush AccentBrush = new SolidColorBrush(MediaColor.FromRgb(139, 196, 255));
 
     public WhatsNewWindow(string previousVersion, string currentVersion, string notes)
     {
@@ -52,7 +54,7 @@ internal sealed class WhatsNewWindow : Window
             lines = new[] { "Исправления и улучшения CacheTrim." };
         foreach (string line in lines)
         {
-            StackPanel row = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 12) };
+            StackPanel row = new() { Orientation = WpfOrientation.Horizontal, Margin = new Thickness(0, 4, 0, 12) };
             row.Children.Add(new TextBlock { Text = "•", FontSize = 17, Foreground = AccentBrush, Margin = new Thickness(0, -2, 10, 0) });
             row.Children.Add(new TextBlock { Text = line, FontSize = 14, Foreground = TextBrush, TextWrapping = TextWrapping.Wrap, MaxWidth = 445 });
             noteList.Children.Add(row);
@@ -65,7 +67,7 @@ internal sealed class WhatsNewWindow : Window
         DockPanel footer = new() { Margin = new Thickness(24, 0, 24, 20), LastChildFill = false };
         TextBlock hint = new() { Text = "Обновление установлено успешно", Foreground = MutedBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         footer.Children.Add(hint);
-        UiButton close = new() { Content = "Понятно", Width = 112, Height = 38, Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, HorizontalAlignment = HorizontalAlignment.Right };
+        UiButton close = new() { Content = "Понятно", Width = 112, Height = 38, Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
         close.Click += (_, _) => Close();
         DockPanel.SetDock(close, Dock.Right);
         footer.Children.Add(close);
