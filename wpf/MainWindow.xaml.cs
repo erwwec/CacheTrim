@@ -96,6 +96,7 @@ public partial class MainWindow : Window
         BusyBanner.BorderBrush = Brush(Theme.Accent);
         StatusSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(58, 27, 33, 43)) : Brush(Theme.Surface);
         ApplyTheme();
+        InitializeHotkeys();
         RefreshMemory();
     }
 
