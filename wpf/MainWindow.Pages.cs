@@ -82,25 +82,20 @@ public partial class MainWindow
         choice.Items.Add("Клод");
         choice.Items.Add("Аниме-аватар");
         choice.SelectedIndex = 0;
-        StackPanel progress = new() { Width = 420, Visibility = Visibility.Collapsed };
-        progress.Children.Add(new TextBlock { Text = "Проверяем и запускаем…", FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text), TextWrapping = TextWrapping.Wrap });
-        progress.Children.Add(new TextBlock { Text = "Первый запуск может занять несколько минут.", FontSize = 12, Foreground = Brush(Theme.Muted), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 7) });
-        progress.Children.Add(new System.Windows.Controls.ProgressBar { Height = 7, IsIndeterminate = true });
         UiButton launch = null;
         launch = AdvancedButton("Запустить выбранного", async () =>
         {
             if (_busy) { MessageBox.Show(this, "Дождись окончания текущей операции.", "CacheTrim", MessageBoxButton.OK, MessageBoxImage.Information); return; }
             launch.IsEnabled = false;
             choice.IsEnabled = false;
-            progress.Visibility = Visibility.Visible;
             try
             {
                 if (choice.SelectedIndex == 0) await LaunchDesktopPetAsync();
                 else await LaunchAnimeAvatarAsync();
             }
-            finally { progress.Visibility = Visibility.Collapsed; choice.IsEnabled = true; launch.IsEnabled = true; }
+            finally { choice.IsEnabled = true; launch.IsEnabled = true; }
         }, true);
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Клод скачивается из GitHub; нужен интернет. Аниме-аватар входит в обновление и запускается отдельно. Их функции различаются.", choice, launch, progress));
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "При первом запуске Клод скачивается из GitHub. После проверки его можно запустить и без интернета. Аниме-аватар входит в обновление; его функции отличаются.", choice, launch));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
             AdvancedButton("Сведения об аниме-аватаре", ShowAnimeAvatarNotices)));
