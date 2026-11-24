@@ -27,3 +27,6 @@ jobs:
         run: |
           dotnet run --project .\tests\WhatsNewTests\WhatsNewTests.csproj -c Release -- .\dist\verify\CacheTrim.exe
           if ($LASTEXITCODE -ne 0) { throw 'Update-notes checks failed' }
+      - name: Check update dialog appears
+        shell: pwsh
+        run: .\tests\SmokeWhatsNew.ps1
