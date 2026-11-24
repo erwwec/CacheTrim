@@ -116,7 +116,7 @@ public partial class MainWindow
 
     internal void ShowWhatsNew(string previousVersion, bool useStagedNotes)
     {
-        Dispatcher.BeginInvoke(new Action(() =>
+        Dispatcher.BeginInvoke(new Action(async () =>
         {
             string notes = string.Empty;
             if (useStagedNotes)
@@ -136,6 +136,21 @@ public partial class MainWindow
                 }
                 catch (IOException) { }
             }
+            // Ask GitHub for every skipped public release. If offline, show current notes
+            // and explicitly say that the full history could not be retrieved.
+            try
+            {
+                using var timeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
+                string history = await ReleaseHistory.FetchAsync(AppInfo.GitHubReleaseApi, previousVersion, AppInfo.Version, timeout.Token);
+                if (!string.IsNullOrWhiteSpace(history)) notes = history;
+                else notes = "Не удалось загрузить полную историю пропущенных версий. Ниже — изменения текущей версии.\n\n" + notes;
+            }
+            catch (Exception ex)
+            {
+                notes = "Не удалось загрузить полную историю пропущенных версий. Ниже — изменения текущей версии.\n\n" + notes;
+                App.Log("история обновлений недоступна: " + ex.Message);
+            }
+            if (!IsLoaded) return;
             WhatsNewWindow window = new(previousVersion, AppInfo.Version, notes) { Owner = this };
             window.ShowDialog();
             WhatsNewState.MarkShown(AppInfo.Version);
