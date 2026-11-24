@@ -63,6 +63,7 @@ public partial class MainWindow
         checks.Children.Add(AdvancedAction("Проверить файлы Windows", "Проверит защищённые файлы и попробует восстановить повреждённые. Может занять несколько минут.", "Проверяются файлы Windows…", "sfc.exe", "/scannow", 30 * 60 * 1000));
         checks.Children.Add(AdvancedAction("Проверить диск C:", "Проверит файловую систему диска C: без отключения тома. Исправление ошибок не запускается.", "Проверяется диск C:…", "chkdsk.exe", "C: /scan", 60 * 60 * 1000));
         checks.Children.Add(Action("Диагностика сети", ShowNetworkDiagnostics));
+        checks.Children.Add(Action("Частота экранов", ShowDisplayDiagnostics));
         checks.Children.Add(Action("Монитор ресурсов", () => OpenSystemTool("resmon.exe")));
         checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
         modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
