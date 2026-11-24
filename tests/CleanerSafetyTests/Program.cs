@@ -45,6 +45,11 @@ internal static class Program {
             sweep.Invoke(cleaner, new object[] { Path.Combine(link, "Temp"), null, "*" });
             if (!File.Exists(protectedFile)) throw new Exception("file behind ancestor link was deleted");
             Console.WriteLine("OK: ancestor directory link is skipped");
-        } finally { if (Directory.Exists(baseDir)) Directory.Delete(baseDir, true); }
+        } finally {
+            string link = Path.Combine(baseDir, "link");
+            // Delete the junction itself, never recurse through it.
+            if (Directory.Exists(link)) Directory.Delete(link, false);
+            if (Directory.Exists(baseDir)) Directory.Delete(baseDir, true);
+        }
     }
 }
