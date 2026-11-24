@@ -49,3 +49,18 @@ jobs:
         run: |
           dotnet run --project .\tests\LyricsTests\LyricsTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Lyrics timing tests failed' }
+      - name: Test file review scans
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\FileReviewTests\FileReviewTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'File review tests failed' }
+      - name: Test cleanup schedule definition
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\TaskSetupTests\TaskSetupTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Schedule definition tests failed' }
+      - name: Test cleanup presets
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CleanupPresetsTests\CleanupPresetsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleanup preset tests failed' }
