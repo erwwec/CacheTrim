@@ -28,6 +28,9 @@
     <EmbeddedResource Include="ThirdPartyNotices.md;WPF-UI-LICENSE.md;WPF-UI-THIRD-PARTY-NOTICES.txt" />
     <EmbeddedResource Include="..\RELEASE_NOTES.md" LogicalName="CacheTrim.ReleaseNotes.txt" />
     <Resource Include="Assets\AppIcon.ico" />
+    <EmbeddedResource Include="..\companion\AnimeAvatar\AnimeAvatar.exe.part00" LogicalName="CacheTrim.AnimeAvatar.part00" />
+    <EmbeddedResource Include="..\companion\AnimeAvatar\AnimeAvatar.exe.part01" LogicalName="CacheTrim.AnimeAvatar.part01" />
+    <EmbeddedResource Include="..\companion\AnimeAvatar\THIRD_PARTY_NOTICES.txt" LogicalName="CacheTrim.AnimeAvatar.Notices.txt" />
   </ItemGroup>
 </Project>
 
