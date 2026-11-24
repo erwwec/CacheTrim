@@ -1021,7 +1021,7 @@ public partial class MainWindow : Window
                 ?? throw new InvalidOperationException("Нет доступа к автозагрузке пользователя.");
             string? current = key.GetValue(AutostartName) as string;
             string own = MyAutostartCommand();
-            if (current != null && !string.Equals(current, own, StringComparison.OrdinalIgnoreCase))
+            if (!PetPolicy.CanChangeAutostart(current, own))
                 throw new InvalidOperationException("Запись автозапуска изменилась. Проверь её в разделе «Автозагрузка» CacheTrim.");
             if (current != null) key.DeleteValue(AutostartName, false);
             else {
@@ -1056,7 +1056,7 @@ public partial class MainWindow : Window
 
     private void Reminder_Tick(object? sender, EventArgs e)
     {
-        if (_reminderMinutes == 0 || DateTime.UtcNow < _nextReminder || _quietMode || SettingsPopup.IsOpen) return;
+        if (!PetPolicy.ReminderDue(_reminderMinutes, _nextReminder, DateTime.UtcNow, _quietMode, SettingsPopup.IsOpen)) return;
         _nextReminder = DateTime.UtcNow.AddMinutes(_reminderMinutes);
         _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
         ShowSpeech(_reminderText);
