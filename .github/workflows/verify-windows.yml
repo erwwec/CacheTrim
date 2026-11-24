@@ -74,3 +74,8 @@ jobs:
         run: |
           dotnet run --project .\tests\DisplayDiagnosticsTests\DisplayDiagnosticsTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Display diagnostics tests failed' }
+      - name: Test pet speech bubble state
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\PetUiTests\PetUiTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Pet speech bubble tests failed' }

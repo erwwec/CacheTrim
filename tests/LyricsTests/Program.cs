@@ -11,3 +11,9 @@ Check(LyricsTimeline.At(lyrics, TimeSpan.FromSeconds(8)) == "last", "seek uses c
 Check(LyricsTimeline.Position(TimeSpan.FromSeconds(10), TimeSpan.Zero, TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(30), 1) == TimeSpan.FromSeconds(40), "interpolate old timeline");
 Check(LyricsTimeline.Position(TimeSpan.FromSeconds(10), TimeSpan.Zero, TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(10), 2) == TimeSpan.FromSeconds(30), "account for playback speed");
 Check(LyricsTimeline.Position(TimeSpan.FromSeconds(10), TimeSpan.Zero, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30), 1) == TimeSpan.FromSeconds(15), "clamp to track end");
+
+var now = new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
+Check(LyricsRetry.Deadline(now, TimeSpan.FromMinutes(12), null) >= now.AddMinutes(12), "server Retry-After delay is honored");
+Check(LyricsRetry.Deadline(now, null, now.AddHours(1)) >= now.AddHours(1), "server Retry-After date is honored");
+Check(LyricsRetry.Deadline(now, TimeSpan.FromSeconds(1), null) >= now.AddMinutes(5), "short retry is slowed down");
+Check(LyricsRetry.Deadline(now, TimeSpan.MaxValue, null) == DateTimeOffset.MaxValue, "extreme retry does not overflow");
