@@ -4,10 +4,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>CacheTrim</RootNamespace>
     <AssemblyName>CacheTrim</AssemblyName>
-    <Version>2.1.12</Version>
-    <AssemblyVersion>2.1.12.0</AssemblyVersion>
-    <FileVersion>2.1.12.0</FileVersion>
-    <InformationalVersion>2.1.12</InformationalVersion>
+    <Version>2.1.13</Version>
+    <AssemblyVersion>2.1.13.0</AssemblyVersion>
+    <FileVersion>2.1.13.0</FileVersion>
+    <InformationalVersion>2.1.13</InformationalVersion>
     <ApplicationManifest>..\app.manifest</ApplicationManifest>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -26,6 +26,7 @@
     <Compile Include="..\winui\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\winui\TweakCatalog.cs" Link="Core\TweakCatalog.cs" />
     <EmbeddedResource Include="ThirdPartyNotices.md;WPF-UI-LICENSE.md;WPF-UI-THIRD-PARTY-NOTICES.txt" />
+    <EmbeddedResource Include="..\RELEASE_NOTES.md" LogicalName="CacheTrim.ReleaseNotes.txt" />
     <Resource Include="Assets\AppIcon.ico" />
   </ItemGroup>
 </Project>
