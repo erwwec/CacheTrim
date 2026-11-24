@@ -1,0 +1,119 @@
+name: Publish CacheTrim v2.1.15
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'Release CacheTrim v2.1.15')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish Windows executable
+        shell: pwsh
+        run: |
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\verify
+          if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
+          $exe = Get-Item .\dist\verify\CacheTrim.exe
+          if ($exe.VersionInfo.FileVersion -ne '2.1.15.0') { throw 'Unexpected CacheTrim file version' }
+      - name: Check update-notes detection on Windows
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\WhatsNewTests\WhatsNewTests.csproj -c Release -- .\dist\verify\CacheTrim.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Update-notes checks failed' }
+      - name: Check update dialog appears
+        shell: pwsh
+        run: .\tests\SmokeWhatsNew.ps1
+      - name: Check Desktop Acrylic backdrop
+        shell: pwsh
+        run: .\tests\SmokeGlass.ps1
+      - name: Test cleanup boundaries
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CleanerSafetyTests\CleanerSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleaner safety tests failed' }
+      - name: Build and smoke-test Desktop Pet
+        shell: pwsh
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
+          .\tests\SmokePet.ps1
+      - name: Test synchronized lyrics timing
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\LyricsTests\LyricsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Lyrics timing tests failed' }
+      - name: Test file review scans
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\FileReviewTests\FileReviewTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'File review tests failed' }
+      - name: Test cleanup schedule definition
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\TaskSetupTests\TaskSetupTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Schedule definition tests failed' }
+      - name: Test cleanup presets
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CleanupPresetsTests\CleanupPresetsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleanup preset tests failed' }
+      - name: Test network diagnostics input
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\NetworkDiagnosticsTests\NetworkDiagnosticsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Network diagnostics input tests failed' }
+      - name: Test display diagnostics filtering
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\DisplayDiagnosticsTests\DisplayDiagnosticsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Display diagnostics tests failed' }
+      - name: Test pet speech bubble state
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\PetUiTests\PetUiTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Pet speech bubble tests failed' }
+      - name: Test update download safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }
+      - name: Prepare checked release files
+        shell: pwsh
+        run: |
+          Copy-Item .\dist\verify\CacheTrim.exe .\dist\CacheTrim.exe -Force
+          Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
+          foreach ($name in @('CacheTrim.exe', 'DesktopPet.exe')) {
+            $path = Join-Path '.\dist' $name
+            $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -Path ($path + '.sha256') -Value $hash -NoNewline -Encoding ASCII
+          }
+      - name: Upload checked files to draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.15
+          target_commitish: ${{ github.sha }}
+          name: v2.1.15
+          draft: true
+          fail_on_unmatched_files: true
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/CacheTrim.exe
+            dist/CacheTrim.exe.sha256
+            dist/DesktopPet.exe
+            dist/DesktopPet.exe.sha256
+      - name: Publish release after uploads
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.15
+          target_commitish: ${{ github.sha }}
+          name: v2.1.15
+          draft: false
+          body_path: RELEASE_NOTES.md
