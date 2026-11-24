@@ -47,6 +47,11 @@ jobs:
           dotnet run --project .\tests\CleanerSafetyTests\CleanerSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Cleaner safety tests failed' }
 
+      - name: Test pet reminders and autostart policy
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\PetPolicyTests\PetPolicyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Pet policy tests failed' }
       - name: Test synchronized lyrics timing
         shell: pwsh
         run: |
