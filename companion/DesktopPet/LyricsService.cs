@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -19,54 +20,84 @@ internal sealed class LyricsService : IDisposable
     private static DateTimeOffset _serverRetryAfter = DateTimeOffset.MinValue;
     private IReadOnlyList<(TimeSpan At, string Text)> _lines = Array.Empty<(TimeSpan, string)>();
 
+    public string Status { get; private set; } = "Ожидание проверки музыки…";
+
+    private GlobalSystemMediaTransportControlsSession? PlayingSession()
+    {
+        var current = _manager!.GetCurrentSession();
+        if (current?.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) return current;
+        return _manager.GetSessions().FirstOrDefault(s => s.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
+    }
+
     public LyricsService() => _client.DefaultRequestHeaders.UserAgent.ParseAdd("CacheTrimDesktopPet/2.1 (https://github.com/erwwec/CacheTrim)");
 
     public async Task<string?> CurrentLineAsync(CancellationToken cancellation)
     {
         _manager ??= await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
         cancellation.ThrowIfCancellationRequested();
-        var session = _manager.GetCurrentSession();
-        if (session == null || session.GetPlaybackInfo().PlaybackStatus != GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) return null;
+        var session = PlayingSession();
+        if (session == null) { Status = "Windows не видит воспроизводимую музыку. Запусти песню в совместимом плеере."; return null; }
         var properties = await session.TryGetMediaPropertiesAsync();
         cancellation.ThrowIfCancellationRequested();
         string title = properties?.Title?.Trim() ?? "";
         string artist = properties?.Artist?.Trim() ?? "";
-        if (title.Length == 0 || artist.Length == 0) return null;
+        if (title.Length == 0 || artist.Length == 0) { Status = "Плеер не передаёт Windows название или исполнителя. Попробуй другой плеер или песню."; return null; }
         var timeline = session.GetTimelineProperties();
         double duration = (timeline.EndTime - timeline.StartTime).TotalSeconds;
         string album = properties?.AlbumTitle?.Trim() ?? "";
         string source = session.SourceAppUserModelId;
         string key = source + "\n" + title + "\n" + artist + "\n" + album + "\n" + Math.Round(duration);
-        if (_song != key) { _song = key; _lines = Array.Empty<(TimeSpan, string)>(); _retryAfter = DateTime.MinValue; }
+        if (_song != key) { _song = key; _lines = Array.Empty<(TimeSpan, string)>(); _retryAfter = DateTime.MinValue; Status = "Ожидание проверки текста…"; }
         if (_lines.Count == 0 && DateTime.UtcNow >= _retryAfter && DateTimeOffset.UtcNow >= _serverRetryAfter)
         {
             // Retry missing lyrics and transient network errors sparingly; no requests for every tick.
             _retryAfter = DateTime.UtcNow.AddMinutes(5);
             var query = "https://lrclib.net/api/get?track_name=" + Uri.EscapeDataString(title) + "&artist_name=" + Uri.EscapeDataString(artist);
+            string withoutAlbum = query;
+            string durationQuery = duration >= 1 && duration <= 3600 ? "&duration=" + ((int)Math.Round(duration)).ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
             if (album.Length > 0) query += "&album_name=" + Uri.EscapeDataString(album);
-            if (duration >= 1 && duration <= 3600) query += "&duration=" + ((int)Math.Round(duration)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            using var response = await _client.GetAsync(query, cancellation);
-            if (response.StatusCode == HttpStatusCode.NotFound) return null;
-            if (response.StatusCode == HttpStatusCode.TooManyRequests || response.StatusCode == HttpStatusCode.ServiceUnavailable)
+            query += durationQuery;
+            Status = "Ищем синхронизированный текст…";
+            HttpResponseMessage response;
+            try
             {
-                var header = response.Headers.RetryAfter;
-                var deadline = LyricsRetry.Deadline(DateTimeOffset.UtcNow, header?.Delta, header?.Date);
-                if (deadline > _serverRetryAfter) _serverRetryAfter = deadline;
-                return null;
+                response = await _client.GetAsync(query, cancellation);
+                // Album tags can differ between player and database. On a 404 only,
+                // retry once without the album while retaining track, artist and duration.
+                if (response.StatusCode == HttpStatusCode.NotFound && album.Length > 0)
+                {
+                    response.Dispose();
+                    response = await _client.GetAsync(withoutAlbum + durationQuery, cancellation);
+                }
             }
-            response.EnsureSuccessStatusCode();
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellation));
-            cancellation.ThrowIfCancellationRequested();
-            if (json.RootElement.TryGetProperty("syncedLyrics", out var lyrics) && lyrics.ValueKind == JsonValueKind.String)
-                _lines = LyricsTimeline.Parse(lyrics.GetString() ?? "");
-            // The player may have changed tracks or sessions while the network request was pending.
-            var active = _manager.GetCurrentSession();
-            if (active == null || active.SourceAppUserModelId != source || active.GetPlaybackInfo().PlaybackStatus != GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) return null;
-            var nowPlaying = await active.TryGetMediaPropertiesAsync();
-            cancellation.ThrowIfCancellationRequested();
-            if ((nowPlaying?.Title?.Trim() ?? "") != title || (nowPlaying?.Artist?.Trim() ?? "") != artist || (nowPlaying?.AlbumTitle?.Trim() ?? "") != album) return null;
-            session = active;
+            catch { Status = "Не удалось связаться с LRCLIB. Проверь интернет; повторная попытка будет позже."; throw; }
+            using (response)
+            {
+                if (response.StatusCode == HttpStatusCode.NotFound) { Status = "LRCLIB не нашёл текст этой песни. Попробуй другой трек."; return null; }
+                if (response.StatusCode == HttpStatusCode.TooManyRequests || response.StatusCode == HttpStatusCode.ServiceUnavailable)
+                {
+                    var header = response.Headers.RetryAfter;
+                    var deadline = LyricsRetry.Deadline(DateTimeOffset.UtcNow, header?.Delta, header?.Date);
+                    if (deadline > _serverRetryAfter) _serverRetryAfter = deadline;
+                    Status = "Сервис временно недоступен или ограничил запросы. Попробуй позже.";
+                    return null;
+                }
+                response.EnsureSuccessStatusCode();
+                using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellation));
+                cancellation.ThrowIfCancellationRequested();
+                if (json.RootElement.TryGetProperty("syncedLyrics", out var lyrics) && lyrics.ValueKind == JsonValueKind.String)
+                    _lines = LyricsTimeline.Parse(lyrics.GetString() ?? "");
+                // The player may have changed tracks or sessions while the network request was pending.
+                var active = PlayingSession();
+                if (active == null || active.SourceAppUserModelId != source || active.GetPlaybackInfo().PlaybackStatus != GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) return null;
+                var nowPlaying = await active.TryGetMediaPropertiesAsync();
+                cancellation.ThrowIfCancellationRequested();
+                if ((nowPlaying?.Title?.Trim() ?? "") != title || (nowPlaying?.Artist?.Trim() ?? "") != artist || (nowPlaying?.AlbumTitle?.Trim() ?? "") != album) return null;
+                session = active;
+            }
         }
+        if (_lines.Count == 0) { if (Status == "Ищем синхронизированный текст…") Status = "Для этой песни нет синхронизированного текста в LRCLIB."; else if (DateTimeOffset.UtcNow < _serverRetryAfter) Status = "Сервис временно ограничил запросы. Попробуй позже."; return null; }
+        Status = "Текст найден. Строки появятся во время воспроизведения.";
         // Refresh position after network latency rather than using the old pre-request snapshot.
         var current = session.GetTimelineProperties();
         var delta = DateTimeOffset.UtcNow - current.LastUpdatedTime;
