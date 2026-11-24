@@ -17,3 +17,9 @@ Check(LyricsRetry.Deadline(now, TimeSpan.FromMinutes(12), null) >= now.AddMinute
 Check(LyricsRetry.Deadline(now, null, now.AddHours(1)) >= now.AddHours(1), "server Retry-After date is honored");
 Check(LyricsRetry.Deadline(now, TimeSpan.FromSeconds(1), null) >= now.AddMinutes(5), "short retry is slowed down");
 Check(LyricsRetry.Deadline(now, TimeSpan.MaxValue, null) == DateTimeOffset.MaxValue, "extreme retry does not overflow");
+
+Check(MediaSessionSelection.Choose(new[] { "chrome.exe", "Spotify.exe" }, "chrome.exe") == 1, "playing Spotify takes precedence over other players");
+Check(MediaSessionSelection.Choose(new[] { "chrome.exe", "SpotifyAB.SpotifyMusic_abc!App" }, "chrome.exe") == 1, "Spotify Store session is recognized");
+Check(MediaSessionSelection.Choose(new[] { "chrome.exe", "other.exe" }, "other.exe") == 1, "otherwise prefer Windows current session");
+Check(MediaSessionSelection.Choose(new[] { "chrome.exe", "other.exe" }, null) == 0, "otherwise use first playing session");
+Check(MediaSessionSelection.Choose(Array.Empty<string>(), null) == -1, "no playing session is handled");

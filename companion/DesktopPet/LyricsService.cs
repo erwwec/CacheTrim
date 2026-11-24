@@ -24,9 +24,9 @@ internal sealed class LyricsService : IDisposable
 
     private GlobalSystemMediaTransportControlsSession? PlayingSession()
     {
-        var current = _manager!.GetCurrentSession();
-        if (current?.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) return current;
-        return _manager.GetSessions().FirstOrDefault(s => s.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
+        var sessions = _manager!.GetSessions().Where(s => s.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing).ToList();
+        int index = MediaSessionSelection.Choose(sessions.Select(s => s.SourceAppUserModelId ?? "").ToList(), _manager.GetCurrentSession()?.SourceAppUserModelId);
+        return index < 0 ? null : sessions[index];
     }
 
     public LyricsService() => _client.DefaultRequestHeaders.UserAgent.ParseAdd("CacheTrimDesktopPet/2.1 (https://github.com/erwwec/CacheTrim)");
@@ -36,7 +36,7 @@ internal sealed class LyricsService : IDisposable
         _manager ??= await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
         cancellation.ThrowIfCancellationRequested();
         var session = PlayingSession();
-        if (session == null) { Status = "Windows не видит воспроизводимую музыку. Запусти песню в совместимом плеере."; return null; }
+        if (session == null) { Status = "Windows не видит воспроизведение. Запусти песню в Spotify на этом компьютере и проверь системные медиаклавиши."; return null; }
         var properties = await session.TryGetMediaPropertiesAsync();
         cancellation.ThrowIfCancellationRequested();
         string title = properties?.Title?.Trim() ?? "";
