@@ -138,14 +138,36 @@ public partial class MainWindow
             return;
         }
 
-        await RunBusyAsync("проверяется и запускается питомец…", async () =>
+        await RunBusyAsync("Проверяем файл Клода…", async () =>
         {
-            UpdateInfo release = await Task.Run(UpdateService.CheckLatest);
-            if (string.IsNullOrWhiteSpace(release.DesktopPetDownloadUrl) || string.IsNullOrWhiteSpace(release.DesktopPetChecksumUrl))
-                throw new InvalidOperationException("В последнем GitHub-релизе пока нет файла Desktop Pet. Проверь подключение и повтори попытку позже.");
-            string petPath = await Task.Run(() => UpdateService.EnsureDesktopPet(release));
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(petPath) { UseShellExecute = true });
-            App.Log("Desktop Pet проверен и запущен из вкладки CacheTrim");
+            string expected = typeof(MainWindow).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+                .Cast<System.Reflection.AssemblyMetadataAttribute>()
+                .FirstOrDefault(a => a.Key == "TrustedDesktopPetSha256")?.Value ?? string.Empty;
+            if (!PetCache.IsHash(expected)) throw new InvalidOperationException("В приложении отсутствует контрольная сумма питомца. Запуск отменён.");
+            string path = PetCache.PathToPet;
+            System.IO.FileStream verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
+            if (verified == null && !string.Equals(expected, PetCache.PreviousHash, StringComparison.OrdinalIgnoreCase))
+            {
+                verified = await Task.Run(() => PetCache.TryOpenVerified(path, PetCache.PreviousHash));
+                if (verified != null && MessageBox.Show(this,
+                    "Найдена проверенная предыдущая версия Клода (2.1.15). Запустить её?\n\n" +
+                    "Выбери «Нет», чтобы скачать версию для текущего CacheTrim. Для скачивания нужен интернет.",
+                    "Питомец без интернета", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                { verified.Dispose(); verified = null; }
+            }
+            if (verified == null)
+            {
+                SetStatus("Скачиваем и проверяем Клода — при первом запуске нужен интернет…");
+                UpdateInfo release = await Task.Run(UpdateService.CheckCurrentPetRelease);
+                if (string.IsNullOrWhiteSpace(release.DesktopPetDownloadUrl) || string.IsNullOrWhiteSpace(release.DesktopPetChecksumUrl))
+                    throw new InvalidOperationException("В релизе этой версии нет питомца. Проверь подключение и повтори попытку.");
+                await Task.Run(() => UpdateService.EnsureDesktopPet(release, expected));
+                verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
+                if (verified == null) throw new InvalidOperationException("Файл питомца не прошёл проверку. Запуск отменён.");
+            }
+            using (verified)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = false });
+            App.Log("Проверенный Desktop Pet запущен из вкладки CacheTrim");
         });
     }
 
