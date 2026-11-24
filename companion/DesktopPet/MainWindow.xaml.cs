@@ -111,7 +111,7 @@ public partial class MainWindow : Window
         _audioTimer.Start();
         RefreshPlatforms();
         _platformScanTimer.Start();
-        if (!StartAudioCapture())
+        if (_audioEnabled && !StartAudioCapture())
         {
             AudioButton.Content = "Звук недоступен — нажми";
         }
@@ -318,7 +318,7 @@ public partial class MainWindow : Window
         if (_isClosing) return;
         Dispatcher.BeginInvoke(() =>
         {
-            if (_isClosing) return;
+            if (_isClosing || !ReferenceEquals(sender, _loopbackCapture)) return;
             var stoppedCapture = _loopbackCapture;
             _loopbackCapture = null;
             if (stoppedCapture is not null)
@@ -672,9 +672,31 @@ public partial class MainWindow : Window
 
     private void CloseMenu_Click(object sender, RoutedEventArgs e) => SettingsPopup.IsOpen = false;
 
+    private void StopAudioCapture()
+    {
+        var capture = _loopbackCapture;
+        _loopbackCapture = null;
+        _audioAvailable = false;
+        if (capture is null) return;
+        capture.DataAvailable -= Loopback_DataAvailable;
+        capture.RecordingStopped -= Loopback_RecordingStopped;
+        try { capture.StopRecording(); } catch { }
+        capture.Dispose();
+    }
+
     private void Audio_Click(object sender, RoutedEventArgs e)
     {
-        if (!_audioAvailable)
+        if (_audioEnabled && _audioAvailable)
+        {
+            _audioEnabled = false;
+            StopAudioCapture();
+            _audioLevel = 0;
+            Interlocked.Exchange(ref _pendingAudioLevel, 0);
+            _musicDetected = false;
+            _audioAboveCount = 0;
+            _audioBelowCount = 0;
+        }
+        else
         {
             if (!StartAudioCapture())
             {
@@ -683,15 +705,7 @@ public partial class MainWindow : Window
             }
             _audioEnabled = true;
         }
-        else _audioEnabled = !_audioEnabled;
         AudioButton.Content = _audioEnabled ? "Реакция на звук: вкл" : "Реакция на звук: выкл";
-        if (!_audioEnabled)
-        {
-            _audioLevel = 0;
-            _musicDetected = false;
-            _audioAboveCount = 0;
-            _audioBelowCount = 0;
-        }
         SaveSettings();
     }
 
@@ -844,13 +858,7 @@ public partial class MainWindow : Window
     {
         _isClosing = true;
         _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop();
-        if (_loopbackCapture is not null)
-        {
-            _loopbackCapture.DataAvailable -= Loopback_DataAvailable;
-            _loopbackCapture.RecordingStopped -= Loopback_RecordingStopped;
-            try { _loopbackCapture.StopRecording(); } catch { }
-            _loopbackCapture.Dispose();
-        }
+        StopAudioCapture();
         base.OnClosed(e);
     }
 }
