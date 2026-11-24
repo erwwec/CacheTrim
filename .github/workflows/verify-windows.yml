@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety']
+    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics']
   pull_request:
     branches: [main]
 
@@ -44,3 +44,8 @@ jobs:
           dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
           if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
           .\tests\SmokePet.ps1
+      - name: Test synchronized lyrics timing
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\LyricsTests\LyricsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Lyrics timing tests failed' }
