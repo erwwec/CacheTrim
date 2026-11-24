@@ -100,25 +100,29 @@ public partial class MainWindow
             }
             finally { progress.Visibility = Visibility.Collapsed; choice.IsEnabled = true; launch.IsEnabled = true; }
         }, true);
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Клод скачивается из GitHub; нужен интернет. Для аниме-аватара распакуй архив и выбери AnimeAvatar.exe. Их функции различаются.", choice, launch, progress));
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Клод скачивается из GitHub; нужен интернет. Аниме-аватар входит в обновление и запускается отдельно. Их функции различаются.", choice, launch, progress));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
-            AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync())));
+            AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
+            AdvancedButton("Сведения об аниме-аватаре", ShowAnimeAvatarNotices)));
         _pageContent!.Children.Add(cards);
+    }
+
+    private void ShowAnimeAvatarNotices()
+    {
+        using var input = typeof(MainWindow).Assembly.GetManifestResourceStream("CacheTrim.AnimeAvatar.Notices.txt");
+        if (input == null) { MessageBox.Show(this, "Сведения об аватаре недоступны.", "Аниме-аватар"); return; }
+        using var reader = new StreamReader(input);
+        MessageBox.Show(this, reader.ReadToEnd(), "Сведения об аниме-аватаре", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async Task LaunchAnimeAvatarAsync()
     {
-        var picker = new Microsoft.Win32.OpenFileDialog { Title = "Выбери AnimeAvatar.exe из распакованного архива", Filter = "AnimeAvatar.exe|AnimeAvatar.exe", CheckFileExists = true, Multiselect = false };
-        if (picker.ShowDialog(this) != true) return;
-        string path = picker.FileName;
+        if (MessageBox.Show(this, "Аниме-аватар — отдельная программа, предоставленная владельцем проекта. Её исходный код и цифровая подпись отсутствуют, безопасность не подтверждена. Она может запуститься с правами администратора, как CacheTrim. Продолжить?", "Аниме-аватар", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         await RunBusyAsync("проверяется аниме-аватар…", async () =>
         {
-            string hash = await Task.Run(() => { using var input = File.OpenRead(path); return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(input)); });
-            if (!string.Equals(hash, "A3256EA1B9476354A32BFA8C592741A98E59682821EE7F0AD20CB5BD87C69D74", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Файл не совпадает с AnimeAvatar.exe из предоставленного архива. Проверь, что выбрана нужная распакованная версия.");
-            if (MessageBox.Show(this, "Это отдельная программа из архива; её исходный код недоступен и безопасность не проверена. CacheTrim запущен с правами администратора, поэтому аватар может получить такие же права. Контрольная сумма подтверждает только совпадение с архивом, а не безопасность. Запустить?", "Аниме-аватар", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            string path = await Task.Run(AnimeAvatarPackage.EnsureExtracted);
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(path)! });
-            App.Log("Запрошен запуск выбранного аниме-аватара");
+            App.Log("Запрошен запуск аниме-аватара из обновления");
         });
     }
 
