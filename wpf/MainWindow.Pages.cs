@@ -220,9 +220,9 @@ public partial class MainWindow
         {
             string ps = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe");
             string output = string.Empty;
-            int code = await Task.Run(() => Tweaks.Run(ps, "-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description 'CacheTrim before changes' -RestorePointType 'MODIFY_SETTINGS'\"", out output, 10 * 60 * 1000));
+            int code = await Task.Run(() => Tweaks.Run(ps, "-NoProfile -ExecutionPolicy Bypass -Command \"Checkpoint-Computer -Description 'CacheTrim before changes' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop\"", out output, 10 * 60 * 1000));
             App.Log("точка восстановления · код " + code + " · " + output);
-            MessageBox.Show(this, code == 0 ? "Точка восстановления создана." : "Windows не создала точку восстановления. Проверьте, включена ли защита системы.\n\n" + output, "Точка восстановления", MessageBoxButton.OK, code == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            MessageBox.Show(this, code == 0 ? "Windows обработала запрос. Проверьте в защите системы, появилась ли новая точка восстановления: Windows может пропустить её создание." : "Windows не создала точку восстановления. Проверьте, включена ли защита системы.\n\n" + output, "Точка восстановления", MessageBoxButton.OK, code == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         });
     }
 
