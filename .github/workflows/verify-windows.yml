@@ -30,3 +30,6 @@ jobs:
       - name: Check update dialog appears
         shell: pwsh
         run: .\tests\SmokeWhatsNew.ps1
+      - name: Check Desktop Acrylic backdrop
+        shell: pwsh
+        run: .\tests\SmokeGlass.ps1
