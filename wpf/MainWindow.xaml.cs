@@ -32,7 +32,16 @@ public partial class MainWindow : Window
     private readonly List<double> _memoryHistory = new();
     private readonly DispatcherTimer _memoryTimer;
     private string _activePage = "memory";
-    private bool _busy;
+    private bool _isBusy;
+    private bool _busy
+    {
+        get => _isBusy;
+        set
+        {
+            _isBusy = value;
+            BusyBanner.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
     private bool _suppressColor;
     private bool _suppressTweakEvents;
     private bool _suppressAutostartEvents;
@@ -62,6 +71,7 @@ public partial class MainWindow : Window
     public MainWindow(int startPage = 0)
     {
         InitializeComponent();
+        InputBindings.Add(new KeyBinding(new SearchCommand(this), new KeyGesture(Key.F, ModifierKeys.Control)));
         BrandVersion.Text = "SYSTEM TOOLS · " + AppInfo.Version;
         PageScroll.SizeChanged += OnPageViewportSizeChanged;
         _settings = App.Settings;
@@ -82,8 +92,11 @@ public partial class MainWindow : Window
         WindowSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(92, 20, 25, 33)) : Brush(Theme.Bg);
         TitleSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(50, 28, 34, 44)) : Brush(Theme.Surface);
         NavigationSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(72, 23, 29, 39)) : Brush(Theme.Surface);
+        BusyBanner.Background = Brush(Theme.Surface);
+        BusyBanner.BorderBrush = Brush(Theme.Accent);
         StatusSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(58, 27, 33, 43)) : Brush(Theme.Surface);
         ApplyTheme();
+        InitializeHotkeys();
         RefreshMemory();
     }
 
@@ -330,7 +343,11 @@ public partial class MainWindow : Window
         return luminance > 0.56 ? Color.FromRgb(12, 20, 30) : Color.FromRgb(248, 250, 253);
     }
 
-    private void SetStatus(string text) => StatusText.Text = text;
+    private void SetStatus(string text)
+    {
+        StatusText.Text = text;
+        if (_busy) BusyOperationText.Text = text;
+    }
 
     private bool SaveConfig(Config config, string successStatus, string logMessage)
     {
@@ -394,6 +411,8 @@ public partial class MainWindow : Window
         WindowSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(92, 20, 25, 33)) : Brush(Theme.Bg);
         TitleSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(50, 28, 34, 44)) : Brush(Theme.Surface);
         NavigationSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(72, 23, 29, 39)) : Brush(Theme.Surface);
+        BusyBanner.Background = Brush(Theme.Surface);
+        BusyBanner.BorderBrush = Brush(Theme.Accent);
         StatusSurface.Background = Theme.IsGlass ? new SolidColorBrush(Color.FromArgb(58, 27, 33, 43)) : Brush(Theme.Surface);
         AdminText.Foreground = Brush(Theme.Accent);
         StatusAdmin.Foreground = Brush(Theme.Accent);

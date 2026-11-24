@@ -24,8 +24,11 @@ public static class PetSmokeWindows {
 }
 '@
 $exe = (Resolve-Path '.\dist\pet-publish\DesktopPet.exe').Path
-$process = Start-Process -FilePath $exe -PassThru
+# Mirror the launcher's read-only lock: verification and start must both work on Windows.
+$locked = [System.IO.File]::Open($exe, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+$process = $null
 try {
+    $process = Start-Process -FilePath $exe -PassThru
     $found = $false
     for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Seconds 1
@@ -36,4 +39,4 @@ try {
     if (-not $found) { throw 'Desktop Pet window was not found' }
     Write-Host 'Desktop Pet window appeared.'
 }
-finally { if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force } }
+finally { if ($null -ne $process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force }; $locked.Dispose() }

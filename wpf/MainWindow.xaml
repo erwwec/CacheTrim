@@ -84,11 +84,27 @@
                         <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,0">
                             <TextBlock x:Name="AdminText" Text="АДМИНИСТРАТОР" FontSize="10" FontWeight="SemiBold" />
                         </StackPanel>
-                        <StackPanel x:Name="NavigationItems" />
+                        <StackPanel>
+                            <Button Content="Поиск функций · Ctrl+F" Margin="3,0,3,10" Padding="8,6" Click="OpenSearch_Click" />
+                            <StackPanel x:Name="NavigationItems" />
+                        </StackPanel>
                     </DockPanel>
                 </Border>
                 <Grid Grid.Column="1">
-                    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Border x:Name="BusyBanner" Visibility="Collapsed" Margin="26,16,26,0" Padding="16,12"
+                            CornerRadius="8" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="Выполняется операция" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="BusyOperationText" Margin="0,4,0,8" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <ProgressBar Height="6" IsIndeterminate="True" Foreground="{DynamicResource SystemAccentColorBrush}" />
+                            <TextBlock Text="Пожалуйста, подожди — время зависит от операции." Margin="0,7,0,0" FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ContentControl x:Name="PageHost" Margin="26,20,26,28" />
                     </ScrollViewer>
                 </Grid>

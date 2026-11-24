@@ -21,6 +21,14 @@ internal static class Program
             try { using var bad = new MemoryStream(new byte[]{(byte)'M',(byte)'Z',9,9,9,9}); AnimeAvatarPackage.Extract(new Stream[]{bad}, path, hash, valid.Length); throw new Exception("tampered avatar accepted"); }
             catch (InvalidDataException) { Check(File.ReadAllBytes(path).SequenceEqual(valid), "tampered avatar rejected without replacing valid file"); }
             Check(Directory.GetFiles(dir, "*.download").Length == 0, "staged avatar is cleaned up");
+            byte[] executable = new byte[4096]; executable[0] = (byte)'M'; executable[1] = (byte)'Z';
+            File.WriteAllBytes(path, executable);
+            string petHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(executable));
+            using (var locked = PetCache.TryOpenVerified(path, petHash)) Check(locked != null, "matching cached pet verified");
+            Check(PetCache.TryOpenVerified(path, new string('0', 64)) == null, "tampered cached pet rejected");
+            Check(PetCache.TryOpenVerified(path, "bad") == null, "invalid trust hash rejected");
+            File.WriteAllBytes(path, new byte[] { (byte)'M', (byte)'Z' });
+            Check(PetCache.TryOpenVerified(path, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))) == null, "undersized executable rejected");
             string resourceDir = Path.Combine("companion", "AnimeAvatar");
             using (var part0 = File.OpenRead(Path.Combine(resourceDir, "AnimeAvatar.exe.part00")))
             using (var part1 = File.OpenRead(Path.Combine(resourceDir, "AnimeAvatar.exe.part01")))

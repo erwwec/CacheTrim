@@ -34,7 +34,21 @@ internal static class UpdateService
 
     public static UpdateInfo CheckLatest()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, AppInfo.GitHubReleaseApi);
+        return ReadRelease(AppInfo.GitHubReleaseApi);
+    }
+
+    public static UpdateInfo CheckCurrentPetRelease()
+    {
+        string api = AppInfo.GitHubReleaseApi.Replace("/releases/latest", "/releases/tags/v" + Uri.EscapeDataString(AppInfo.Version));
+        UpdateInfo release = ReadRelease(api);
+        if (!string.Equals(release.Version, AppInfo.Version, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Версия релиза питомца не соответствует CacheTrim.");
+        return release;
+    }
+
+    private static UpdateInfo ReadRelease(string api)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, api);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
         using HttpResponseMessage response = Client.Send(request);
@@ -203,7 +217,7 @@ internal static class UpdateService
         }) ?? throw new InvalidOperationException("Не удалось запустить установщик обновления.");
     }
 
-    public static string EnsureDesktopPet(UpdateInfo update)
+    public static string EnsureDesktopPet(UpdateInfo update, string trustedHash)
     {
         if (update is null)
             throw new ArgumentNullException(nameof(update));
@@ -216,8 +230,9 @@ internal static class UpdateService
         string staged = target + ".download";
         string expected = Client.GetStringAsync(update.DesktopPetChecksumUrl).GetAwaiter().GetResult()
             .Trim().Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
-        if (expected.Length != 64 || expected.Any(c => !Uri.IsHexDigit(c)))
-            throw new InvalidDataException("Контрольная сумма питомца в GitHub Release имеет неверный формат.");
+        if (!PetCache.IsHash(expected) || !PetCache.IsHash(trustedHash) ||
+            !string.Equals(expected, trustedHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Контрольная сумма питомца не совпадает с суммой, встроенной в CacheTrim.");
 
         if (File.Exists(target))
         {

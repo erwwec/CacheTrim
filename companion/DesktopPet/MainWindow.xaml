@@ -38,6 +38,21 @@
                     <TextBlock x:Name="SizeLabel" Text="Размер: 100%" Foreground="White" Margin="2,5,2,0" />
                     <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="2" Value="0.6" Width="205"
                             ValueChanged="SizeSlider_ValueChanged" Margin="0,0,0,4" />
+                    <TextBlock x:Name="OpacityLabel" Foreground="White" Margin="2,4,2,0" />
+                    <Slider x:Name="OpacitySlider" Minimum="0.35" Maximum="1" Value="1" Width="205" ValueChanged="OpacitySlider_ValueChanged" />
+                    <Button Content="Запомнить стартовое положение" Click="RememberPosition_Click" Margin="0,2" Padding="6,3" />
+                    <Button Content="Сбросить положение" Click="ResetPosition_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="PetAutostartButton" Content="Автозапуск: выкл" Click="PetAutostart_Click" Margin="0,2" Padding="6,3" />
+                    <TextBlock Text="Напоминание (пока Клод запущен)" Foreground="White" Margin="2,6,2,2" />
+                    <ComboBox x:Name="ReminderInterval" SelectedIndex="0" Margin="0,2">
+                        <ComboBoxItem Content="Выключено" /><ComboBoxItem Content="Каждые 30 минут" />
+                        <ComboBoxItem Content="Каждый час" /><ComboBoxItem Content="Каждые 2 часа" />
+                    </ComboBox>
+                    <TextBox x:Name="ReminderText" Text="Пора сделать перерыв!" MaxLength="80" Margin="0,2" />
+                    <Button Content="Сохранить напоминание" Click="SaveReminder_Click" Margin="0,2" Padding="6,3" />
+                    <TextBlock Text="Быстрые команды" Foreground="White" Margin="2,7,2,2" />
+                    <Button Content="Показать рабочий стол" Click="ShowDesktop_Click" Margin="0,2" Padding="6,3" />
+                    <Button Content="Открыть папку загрузок" Click="OpenDownloads_Click" Margin="0,2" Padding="6,3" />
                     <TextBlock x:Name="ChatterLabel" Foreground="White" Margin="2,4,2,0" />
                     <Slider x:Name="ChatterSlider" Minimum="0" Maximum="2" Value="1" Width="205"
                             ValueChanged="ChatterSlider_ValueChanged" Margin="0,0,0,3" />

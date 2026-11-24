@@ -20,13 +20,6 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish self-contained WPF app
-        shell: powershell
-        run: |
-          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\publish
-          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
-          Copy-Item .\dist\publish\CacheTrim.exe .\dist\CacheTrim.exe -Force
-
       - name: Publish Desktop Pet companion
         shell: powershell
         run: |
@@ -34,6 +27,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Desktop Pet publish failed: $LASTEXITCODE" }
           Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
 
+
+      - name: Publish self-contained WPF app
+        shell: powershell
+        run: |
+          $petHash = (Get-FileHash .\dist\pet-publish\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:TrustedDesktopPetSha256=$petHash" -o .\dist\publish
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
+          Copy-Item .\dist\publish\CacheTrim.exe .\dist\CacheTrim.exe -Force
+
+
+      - name: Verify embedded pet integrity pin
+        shell: powershell
+        run: |
+          $petHash = (Get-FileHash .\dist\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $assembly = '.\wpf\obj\x64\Release\net10.0-windows10.0.19041.0\win-x64\CacheTrim.dll'
+          dotnet run --project .\tests\BuildPinTests\BuildPinTests.csproj -c Release -- $assembly $petHash
+          if ($LASTEXITCODE -ne 0) { throw 'App does not pin the released Desktop Pet' }
       - name: Create SHA-256 checksum
         shell: powershell
         run: |

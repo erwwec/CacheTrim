@@ -249,6 +249,8 @@ public partial class MainWindow
         fileActions.Children.Add(CompactAction("Открыть папку данных", () => OpenPath(Config.LogDir)));
         localFiles.Children.Add(fileActions);
         Border filesCard = Card("ДАННЫЕ CACHETRIM", localFiles); filesCard.Width = settingsCardWidth; filesCard.Margin = new Thickness(0, 0, 0, 16); cards.Children.Add(filesCard);
+        Border hotkeyCard = Card("ГОРЯЧИЕ КЛАВИШИ", CreateHotkeySettings());
+        hotkeyCard.Width = settingsCardWidth; hotkeyCard.Margin = new Thickness(0, 0, 16, 16); cards.Children.Add(hotkeyCard);
         _pageContent.Children.Add(cards);
     }
 
@@ -437,6 +439,7 @@ public partial class MainWindow
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        DisposeHotkeys();
         _memoryTimer.Stop();
         App.LogAdded -= OnLogAdded;
     }
