@@ -40,6 +40,9 @@
                             ValueChanged="SizeSlider_ValueChanged" Margin="0,0,0,4" />
                     <TextBlock x:Name="OpacityLabel" Foreground="White" Margin="2,4,2,0" />
                     <Slider x:Name="OpacitySlider" Minimum="0.35" Maximum="1" Value="1" Width="205" ValueChanged="OpacitySlider_ValueChanged" />
+                    <Button Content="Запомнить стартовое положение" Click="RememberPosition_Click" Margin="0,2" Padding="6,3" />
+                    <Button Content="Сбросить положение" Click="ResetPosition_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="PetAutostartButton" Content="Автозапуск: выкл" Click="PetAutostart_Click" Margin="0,2" Padding="6,3" />
                     <TextBlock Text="Напоминание (пока Клод запущен)" Foreground="White" Margin="2,6,2,2" />
                     <ComboBox x:Name="ReminderInterval" SelectedIndex="0" Margin="0,2">
                         <ComboBoxItem Content="Выключено" /><ComboBoxItem Content="Каждые 30 минут" />

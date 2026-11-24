@@ -30,6 +30,7 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _reminderTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private double _petOpacity = 1;
+    private double _savedLeft = double.NaN, _savedTop = double.NaN;
     private int _reminderMinutes;
     private string _reminderText = "Пора сделать перерыв!";
     private DateTime _nextReminder = DateTime.MaxValue;
@@ -111,6 +112,7 @@ public partial class MainWindow : Window
         OpacityLabel.Text = $"Непрозрачность: {_petOpacity:P0}";
         ReminderInterval.SelectedIndex = _reminderMinutes switch { 30 => 1, 60 => 2, 120 => 3, _ => 0 };
         ReminderText.Text = _reminderText;
+        RefreshAutostartLabel();
         _nextReminder = _reminderMinutes > 0 ? DateTime.UtcNow.AddMinutes(_reminderMinutes) : DateTime.MaxValue;
         _reminderTimer.Tick += Reminder_Tick;
         _reminderTimer.Start();
@@ -126,6 +128,11 @@ public partial class MainWindow : Window
         PhraseTextBox.Text = string.Join(Environment.NewLine, _customPhrases);
         Left = SystemParameters.WorkArea.Right - ModelRight * _uiScale - 28;
         Top = SystemParameters.WorkArea.Bottom - ModelBottom * _uiScale;
+        if (double.IsFinite(_savedLeft) && double.IsFinite(_savedTop)) {
+            var area = SystemParameters.WorkArea;
+            Left = Math.Clamp(_savedLeft, area.Left - ModelLeft * _uiScale, Math.Max(area.Left - ModelLeft * _uiScale, area.Right - ModelRight * _uiScale));
+            Top = Math.Clamp(_savedTop, area.Top - ModelTop * _uiScale, Math.Max(area.Top - ModelTop * _uiScale, area.Bottom - ModelBottom * _uiScale));
+        }
         _initializing = false;
         _nextIdlePollAt = DateTime.UtcNow;
         ScheduleNextLeap(DateTime.UtcNow);
@@ -919,6 +926,8 @@ public partial class MainWindow : Window
                     if (text.Length > 0) _reminderText = text.Length > 80 ? text[..80] : text;
                 } catch (FormatException) { }
             }
+            _savedLeft = ParseSetting(values, 15, double.NaN, -100000, 100000);
+            _savedTop = ParseSetting(values, 16, double.NaN, -100000, 100000);
             _lyricsEnabled = values.Length > 11 && bool.TryParse(values[11], out var lyrics) && lyrics;
             if (values.Length > 9)
                 _collectionItems.AddRange(values[9].Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -952,7 +961,8 @@ public partial class MainWindow : Window
                 _quietMode.ToString(), _surprisesEnabled.ToString(), _favoriteSpotEnabled.ToString(), _audioEnabled.ToString(),
                 _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases, _lyricsEnabled.ToString(),
                 _petOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture), _reminderMinutes.ToString(),
-                Convert.ToBase64String(Encoding.UTF8.GetBytes(_reminderText))
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(_reminderText)),
+                _savedLeft.ToString(System.Globalization.CultureInfo.InvariantCulture), _savedTop.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
             File.WriteAllLines(tempPath, values);
             File.Move(tempPath, _settingsPath, true);
@@ -976,6 +986,51 @@ public partial class MainWindow : Window
         Left = modelCenterX - (ModelLeft + ModelRight) / 2 * newScale;
         SizeLabel.Text = $"Размер: {newScale:P0}";
         SaveSettings();
+    }
+
+    private void RememberPosition_Click(object sender, RoutedEventArgs e)
+    {
+        _savedLeft = Left; _savedTop = Top; SaveSettings();
+        SettingsPopup.IsOpen = false;
+        if (!_quietMode) ShowSpeech("Положение сохранено!");
+    }
+    private void ResetPosition_Click(object sender, RoutedEventArgs e)
+    {
+        _savedLeft = _savedTop = double.NaN; SaveSettings();
+        SettingsPopup.IsOpen = false;
+        if (!_quietMode) ShowSpeech("Стартовое положение сброшено.");
+    }
+
+    private const string AutostartKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string AutostartName = "CacheTrim Claude Desktop Pet";
+    private string MyAutostartCommand() => "\"" + Environment.ProcessPath + "\"";
+    private void RefreshAutostartLabel()
+    {
+        try {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutostartKey);
+            string? current = key?.GetValue(AutostartName) as string;
+            PetAutostartButton.Content = string.Equals(current, MyAutostartCommand(), StringComparison.OrdinalIgnoreCase)
+                ? "Автозапуск: вкл" : current == null ? "Автозапуск: выкл" : "Автозапуск: другая запись";
+        } catch { PetAutostartButton.Content = "Автозапуск недоступен"; }
+    }
+    private void PetAutostart_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            if (string.IsNullOrWhiteSpace(Environment.ProcessPath)) throw new InvalidOperationException("Не удалось определить файл Клода.");
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(AutostartKey)
+                ?? throw new InvalidOperationException("Нет доступа к автозагрузке пользователя.");
+            string? current = key.GetValue(AutostartName) as string;
+            string own = MyAutostartCommand();
+            if (current != null && !string.Equals(current, own, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Запись автозапуска изменилась. Проверь её в разделе «Автозагрузка» CacheTrim.");
+            if (current != null) key.DeleteValue(AutostartName, false);
+            else {
+                if (MessageBox.Show(this, "Запускать Клода при входе в Windows? Он будет запускаться от текущего пользователя напрямую, без проверки CacheTrim при каждом входе. Отключить можно этой же кнопкой.",
+                    "Автозапуск Клода", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes) return;
+                key.SetValue(AutostartName, own, Microsoft.Win32.RegistryValueKind.String);
+            }
+            RefreshAutostartLabel();
+        } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Автозапуск Клода"); }
     }
 
     private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
