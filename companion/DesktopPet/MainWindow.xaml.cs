@@ -28,6 +28,12 @@ public partial class MainWindow : Window
     private static readonly ImageSource PhoneSprite = LoadSprite("claude_phone.png");
     private static readonly ImageSource SleepSprite = LoadSprite("claude_sleep.png");
 
+    private readonly DispatcherTimer _reminderTimer = new() { Interval = TimeSpan.FromSeconds(10) };
+    private double _petOpacity = 1;
+    private int _reminderMinutes;
+    private string _reminderText = "Пора сделать перерыв!";
+    private DateTime _nextReminder = DateTime.MaxValue;
+    private DateTime _reminderHoldUntil = DateTime.MinValue;
     private readonly DispatcherTimer _motionTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _lyricsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private LyricsService? _lyricsService;
@@ -100,6 +106,14 @@ public partial class MainWindow : Window
         ChatterSlider.Value = _chatterLevel;
         JumpSlider.Value = _jumpRate;
         SizeSlider.Value = _uiScale;
+        OpacitySlider.Value = _petOpacity;
+        PetCanvas.Opacity = _petOpacity;
+        OpacityLabel.Text = $"Непрозрачность: {_petOpacity:P0}";
+        ReminderInterval.SelectedIndex = _reminderMinutes switch { 30 => 1, 60 => 2, 120 => 3, _ => 0 };
+        ReminderText.Text = _reminderText;
+        _nextReminder = _reminderMinutes > 0 ? DateTime.UtcNow.AddMinutes(_reminderMinutes) : DateTime.MaxValue;
+        _reminderTimer.Tick += Reminder_Tick;
+        _reminderTimer.Start();
         ChatterLabel.Text = ChatterLabelFor(_chatterLevel);
         JumpLabel.Text = JumpLabelFor(_jumpRate);
         QuietButton.Content = _quietMode ? "Не отвлекать: вкл" : "Не отвлекать: выкл";
@@ -579,6 +593,7 @@ public partial class MainWindow : Window
 
     private void ShowSpeech(string text, bool isLyrics = false)
     {
+        if (DateTime.UtcNow < _reminderHoldUntil) return;
         _speechIsLyrics = isLyrics;
         SpeechText.Text = text;
         SpeechBubble.Visibility = Visibility.Visible;
@@ -896,6 +911,14 @@ public partial class MainWindow : Window
             _audioEnabled = values.Length <= 6 || !bool.TryParse(values[6], out var audio) || audio;
             _collectionEnabled = values.Length <= 7 || !bool.TryParse(values[7], out var collection) || collection;
             _routineEnabled = values.Length <= 8 || !bool.TryParse(values[8], out var routine) || routine;
+            _petOpacity = ParseSetting(values, 12, 1, 0.35, 1);
+            if (values.Length > 13 && int.TryParse(values[13], out int minutes) && minutes is 30 or 60 or 120) _reminderMinutes = minutes;
+            if (values.Length > 14 && values[14].Length < 500) {
+                try {
+                    string text = Encoding.UTF8.GetString(Convert.FromBase64String(values[14])).Trim();
+                    if (text.Length > 0) _reminderText = text.Length > 80 ? text[..80] : text;
+                } catch (FormatException) { }
+            }
             _lyricsEnabled = values.Length > 11 && bool.TryParse(values[11], out var lyrics) && lyrics;
             if (values.Length > 9)
                 _collectionItems.AddRange(values[9].Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -927,7 +950,9 @@ public partial class MainWindow : Window
                 _chatterLevel.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _jumpRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _quietMode.ToString(), _surprisesEnabled.ToString(), _favoriteSpotEnabled.ToString(), _audioEnabled.ToString(),
-                _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases, _lyricsEnabled.ToString()
+                _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases, _lyricsEnabled.ToString(),
+                _petOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture), _reminderMinutes.ToString(),
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(_reminderText))
             };
             File.WriteAllLines(tempPath, values);
             File.Move(tempPath, _settingsPath, true);
@@ -953,12 +978,64 @@ public partial class MainWindow : Window
         SaveSettings();
     }
 
+    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_initializing || PetCanvas == null) return;
+        _petOpacity = Math.Clamp(e.NewValue, 0.35, 1);
+        PetCanvas.Opacity = _petOpacity;
+        OpacityLabel.Text = $"Непрозрачность: {_petOpacity:P0}";
+        SaveSettings();
+    }
+
+    private void SaveReminder_Click(object sender, RoutedEventArgs e)
+    {
+        _reminderMinutes = ReminderInterval.SelectedIndex switch { 1 => 30, 2 => 60, 3 => 120, _ => 0 };
+        _reminderText = ReminderText.Text.Trim();
+        if (_reminderText.Length == 0) _reminderText = "Пора сделать перерыв!";
+        ReminderText.Text = _reminderText;
+        _nextReminder = _reminderMinutes > 0 ? DateTime.UtcNow.AddMinutes(_reminderMinutes) : DateTime.MaxValue;
+        SaveSettings();
+        SettingsPopup.IsOpen = false;
+        if (!_quietMode) { _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(6); ShowSpeech(_reminderMinutes == 0 ? "Напоминания выключены." : "Напоминание сохранено!"); }
+    }
+
+    private void Reminder_Tick(object? sender, EventArgs e)
+    {
+        if (_reminderMinutes == 0 || DateTime.UtcNow < _nextReminder || _quietMode || SettingsPopup.IsOpen) return;
+        _nextReminder = DateTime.UtcNow.AddMinutes(_reminderMinutes);
+        _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
+        ShowSpeech(_reminderText);
+        _reminderHoldUntil = DateTime.UtcNow.AddSeconds(8);
+        _speechEndsAt = DateTime.UtcNow.AddSeconds(8);
+    }
+
+    private void ShowDesktop_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            Type? type = Type.GetTypeFromProgID("Shell.Application");
+            if (type == null) throw new InvalidOperationException("Команда Windows недоступна.");
+            object shell = Activator.CreateInstance(type)!;
+            type.InvokeMember("ToggleDesktop", System.Reflection.BindingFlags.InvokeMethod, null, shell, null);
+            SettingsPopup.IsOpen = false;
+        } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось показать рабочий стол"); }
+    }
+
+    private void OpenDownloads_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            var start = new System.Diagnostics.ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+            start.ArgumentList.Add("shell:Downloads");
+            System.Diagnostics.Process.Start(start);
+            SettingsPopup.IsOpen = false;
+        } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось открыть загрузки"); }
+    }
+
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     protected override void OnClosed(EventArgs e)
     {
         _isClosing = true;
-        _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
+        _reminderTimer.Stop(); _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
         _lyricsCancellation.Cancel(); _lyricsCancellation.Dispose(); _lyricsService?.Dispose();
         StopAudioCapture();
         base.OnClosed(e);
