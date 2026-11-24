@@ -64,3 +64,8 @@ jobs:
         run: |
           dotnet run --project .\tests\CleanupPresetsTests\CleanupPresetsTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Cleanup preset tests failed' }
+      - name: Test network diagnostics input
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\NetworkDiagnosticsTests\NetworkDiagnosticsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Network diagnostics input tests failed' }
