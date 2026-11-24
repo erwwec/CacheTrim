@@ -111,12 +111,13 @@ namespace CacheTrim
 
             if (c.Recycle && !_preview)
             {
+                _gameGuard.Check(true);
                 // Windows empties the whole recycle bin, bypassing path exclusions.
                 if (_options.ExcludedPaths.Count > 0) _log("-- корзина пропущена: включены исключения");
                 else _log(Native.EmptyRecycleBin() ? "-- корзина очищена" : "-- корзина: уже пуста или недоступна");
             }
 
-            if (!_preview) PurgeMemory(c);
+            if (!_preview) { _gameGuard.Check(true); PurgeMemory(c); }
 
             _log(string.Format(_preview ? "-- предпросмотр: {0}, файлов {1}, пропущено {2}" : "-- итого: {0}, файлов {1}, пропущено {2}",
                 FormatBytes(_bytes), _files, _skipped));
@@ -261,6 +262,7 @@ namespace CacheTrim
             bool restartWua;
             bool restartBits;
             restartWua = false; restartBits = false;
+            if (!_preview) _gameGuard.Check(true);
             bool wuaStopped = _preview || StopService("wuauserv", out restartWua);
             bool bitsStopped = _preview || StopService("bits", out restartBits);
             try
@@ -435,6 +437,7 @@ namespace CacheTrim
             // Deepest first so parents are empty by the time we try them.
             for (int i = dirs.Count - 1; i >= 0; i--)
             {
+                _gameGuard.Check();
                 try
                 {
                     if (string.Equals(dirs[i], root, StringComparison.OrdinalIgnoreCase))
