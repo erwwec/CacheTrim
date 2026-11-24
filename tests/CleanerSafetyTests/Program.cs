@@ -15,6 +15,13 @@ namespace CacheTrim {
 }
 internal static class Program {
     private static void Main() {
+        try { Run(); }
+        catch (Exception ex) {
+            Console.Error.WriteLine("::error::Cleaner test failed: " + ex.ToString().Replace("\r", " ").Replace("\n", " "));
+            throw;
+        }
+    }
+    private static void Run() {
         string baseDir = Path.Combine(Path.GetTempPath(), "CacheTrimSafety-" + Guid.NewGuid());
         try {
             string regular = Path.Combine(baseDir, "regular");
