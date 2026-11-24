@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics']
+    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress']
   pull_request:
     branches: [main]
 
@@ -17,10 +17,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Build and smoke-test Desktop Pet
+        shell: pwsh
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
+          .\tests\SmokePet.ps1
+
       - name: Publish Windows executable
         shell: pwsh
         run: |
-          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\verify
+          $petHash = (Get-FileHash .\dist\pet-publish\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:TrustedDesktopPetSha256=$petHash" -o .\dist\verify
           if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
       - name: Check update-notes detection on Windows
         shell: pwsh
@@ -38,12 +46,7 @@ jobs:
         run: |
           dotnet run --project .\tests\CleanerSafetyTests\CleanerSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Cleaner safety tests failed' }
-      - name: Build and smoke-test Desktop Pet
-        shell: pwsh
-        run: |
-          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
-          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
-          .\tests\SmokePet.ps1
+
       - name: Test synchronized lyrics timing
         shell: pwsh
         run: |

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- The shipped pet is pinned in the app; release CI overrides this with the hash of its own pet build. -->
+    <TrustedDesktopPetSha256 Condition="'$(TrustedDesktopPetSha256)' == ''">76de5744780dd950e428a514d3b6c36fc30d407dcd57c815ef1df082738c2dab</TrustedDesktopPetSha256>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>CacheTrim</RootNamespace>
@@ -21,6 +23,10 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>TrustedDesktopPetSha256</_Parameter1>
+      <_Parameter2>$(TrustedDesktopPetSha256)</_Parameter2>
+    </AssemblyAttribute>
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
     <Compile Include="..\winui\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
