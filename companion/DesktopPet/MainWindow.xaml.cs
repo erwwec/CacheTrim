@@ -35,6 +35,8 @@ public partial class MainWindow : Window
     private bool _lyricsEnabled;
     private bool _lyricsBusy;
     private string _lyricsLastLine = "";
+    private string _lyricsStatus = "Проверка ещё не выполнялась.";
+    private DateTime _lyricsHoldUntil = DateTime.MinValue;
     private bool _speechIsLyrics;
     private DateTime _nextLyricsAttemptAt = DateTime.MinValue;
     private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
@@ -762,7 +764,7 @@ public partial class MainWindow : Window
 
     private async void Lyrics_Tick(object? sender, EventArgs e)
     {
-        if (!_lyricsEnabled || _quietMode || _lyricsBusy || _isClosing || DateTime.UtcNow < _nextLyricsAttemptAt) return;
+        if (!_lyricsEnabled || _quietMode || _lyricsBusy || _isClosing || DateTime.UtcNow < _nextLyricsAttemptAt || DateTime.UtcNow < _lyricsHoldUntil) return;
         _lyricsBusy = true;
         var token = _lyricsCancellation.Token;
         try
@@ -770,6 +772,8 @@ public partial class MainWindow : Window
             _lyricsService ??= new LyricsService();
             string? line = await _lyricsService.CurrentLineAsync(token);
             if (token.IsCancellationRequested || !_lyricsEnabled || _quietMode || _isClosing) return;
+            _lyricsStatus = _lyricsService.Status;
+            if (DateTime.UtcNow < _lyricsHoldUntil) return;
             if (string.IsNullOrWhiteSpace(line)) { HideLyricSpeech(); return; }
             if (line.Length > 180) line = line[..180] + "…";
             if (line != _lyricsLastLine || !_speechIsLyrics || SpeechBubble.Visibility != Visibility.Visible || SpeechText.Text != line)
@@ -779,7 +783,7 @@ public partial class MainWindow : Window
             }
             _speechEndsAt = DateTime.UtcNow.AddSeconds(3);
         }
-        catch (Exception) { if (!token.IsCancellationRequested && !_isClosing) { HideLyricSpeech(); _nextLyricsAttemptAt = DateTime.UtcNow.AddSeconds(5); } }
+        catch (Exception) { if (!token.IsCancellationRequested && !_isClosing) { _lyricsStatus = "Не удалось проверить проигрыватель или связаться с LRCLIB. Проверь интернет и повтори позже."; HideLyricSpeech(); _nextLyricsAttemptAt = DateTime.UtcNow.AddSeconds(5); } }
         finally { _lyricsBusy = false; }
     }
 
@@ -813,6 +817,26 @@ public partial class MainWindow : Window
             _lyricsLastLine = "";
         }
         SaveSettings();
+    }
+
+    private void BringSecret_Click(object sender, RoutedEventArgs e)
+    {
+        // An explicit request shows the surprise even when automatic chatter is disabled.
+        int item = _random.Next(4);
+        _collectionItems.Add(item);
+        while (_collectionItems.Count > 8) _collectionItems.RemoveAt(0);
+        SaveSettings();
+        _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(6);
+        Jump_Click(sender, e);
+        string surprise = item switch { 0 => "звёздочка ⭐", 1 => "камешек 💎", 2 => "клевер 🍀", _ => "подарок 🎁" };
+        ShowSpeech("Принёс секрет: " + surprise);
+    }
+
+    private void LyricsStatus_Click(object sender, RoutedEventArgs e)
+    {
+        string status = !_lyricsEnabled ? "Текст песни выключен. Сначала включи его в этом меню и подтверди запрос к LRCLIB." :
+            _quietMode ? "Включён режим «Не отвлекать»: он скрывает текст. Выключи его для показа песен." : _lyricsStatus;
+        MessageBox.Show(this, status + "\n\nПлеер должен передавать название и исполнителя в управление мультимедиа Windows. Текст находится не для всех песен. Аудио не отправляется.", "Текст песни", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Surprise_Click(object sender, RoutedEventArgs e)
