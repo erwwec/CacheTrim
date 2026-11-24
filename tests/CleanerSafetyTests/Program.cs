@@ -31,11 +31,43 @@ internal static class Program {
             string ordinary = Path.Combine(regular, "delete-me.tmp");
             string protectedFile = Path.Combine(outside, "Temp", "protected.tmp");
             File.WriteAllText(ordinary, "ordinary"); File.WriteAllText(protectedFile, "protected");
-            var cleaner = new Cleaner(Console.WriteLine);
+            var options = new CleanupOptions();
+            var cleaner = new Cleaner(Console.WriteLine, options);
             var sweep = typeof(Cleaner).GetMethod("Sweep", BindingFlags.NonPublic | BindingFlags.Instance)!;
             sweep.Invoke(cleaner, new object[] { regular, null, "*" });
             if (File.Exists(ordinary)) throw new Exception("ordinary temp file not cleaned");
             Console.WriteLine("OK: ordinary temp file cleaned");
+            string runningProcess = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+            var guard = new GameGuard(new[] { Path.Combine(baseDir, runningProcess + ".exe") });
+            try { guard.Check(true); throw new Exception("running protected process was ignored"); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(runningProcess, StringComparison.OrdinalIgnoreCase)) { Console.WriteLine("OK: running protected process blocks maintenance"); }
+            try { guard.Check(); throw new Exception("repeat check bypassed active game"); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(runningProcess, StringComparison.OrdinalIgnoreCase)) { Console.WriteLine("OK: rapid retry does not bypass game guard"); }
+
+            string excludedDir = Path.Combine(regular, "excluded");
+            Directory.CreateDirectory(excludedDir);
+            string excluded = Path.Combine(excludedDir, "keep.tmp");
+            string candidate = Path.Combine(regular, "candidate.tmp");
+            File.WriteAllText(excluded, "do not delete"); File.WriteAllText(candidate, "candidate");
+            options.ExcludedPaths.Add(excludedDir); options.Validate();
+            var preview = new Cleaner(Console.WriteLine, options);
+            typeof(Cleaner).GetField("_preview", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(preview, true);
+            sweep.Invoke(preview, new object[] { regular, null, "*" });
+            if (!File.Exists(candidate) || !File.Exists(excluded)) throw new Exception("preview deleted data");
+            if (!preview.PreviewPaths.Any(p => p.EndsWith("candidate.tmp")) || preview.PreviewPaths.Any(p => p.EndsWith("keep.tmp"))) throw new Exception("preview ignored exclusions");
+            sweep.Invoke(cleaner, new object[] { regular, null, "*" });
+            if (!File.Exists(excluded) || File.Exists(candidate)) throw new Exception("cleanup ignored exclusions");
+            Console.WriteLine("OK: preview is read-only and respects exclusions; cleanup respects exclusions");
+            string old = Path.Combine(regular, "old.tmp"); string recent = Path.Combine(regular, "recent.tmp");
+            File.WriteAllText(old, "old"); File.WriteAllText(recent, "new");
+            File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddDays(-2));
+            options.MinimumAgeHours["temp"] = 24;
+            typeof(Cleaner).GetMethod("Category", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(cleaner, new object[] { "temp" });
+            sweep.Invoke(cleaner, new object[] { regular, null, "*" });
+            if (File.Exists(old) || !File.Exists(recent)) throw new Exception("per-category age not respected");
+            Console.WriteLine("OK: age policy leaves recent files intact");
+            try { new CleanupOptions { ExcludedPaths = new List<string> { "relative-path" } }.Validate(); throw new Exception("invalid exclusion accepted"); }
+            catch (ArgumentException) { Console.WriteLine("OK: invalid exclusion is rejected"); }
             string link = Path.Combine(baseDir, "link");
             if (OperatingSystem.IsWindows()) {
                 using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c mklink /J \"" + link + "\" \"" + outside + "\"") { UseShellExecute = false, CreateNoWindow = true });

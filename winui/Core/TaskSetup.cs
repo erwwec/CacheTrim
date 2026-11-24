@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Security.Principal;
 using System.Text;
+using System.Xml.Linq;
+using System.Globalization;
 
 namespace CacheTrim
 {
@@ -12,6 +14,7 @@ namespace CacheTrim
     internal static class TaskSetup
     {
         public const string TaskName = "CacheTrim Autostart";
+        public const string IdleTaskName = "CacheTrim Idle Cleanup";
 
         public static bool IsInstalled()
         {
@@ -59,9 +62,53 @@ namespace CacheTrim
             }
         }
 
-        private static string BuildXml(string exePath, int delaySeconds)
+        public static string InstallIdle(string exePath, TimeSpan time)
         {
-            string user = WindowsIdentity.GetCurrent().Name;
+            string xmlPath = null;
+            try
+            {
+                xmlPath = Path.Combine(Path.GetTempPath(), "CacheTrimIdle-" + Guid.NewGuid().ToString("N") + ".xml");
+                string user = WindowsIdentity.GetCurrent().Name;
+                File.WriteAllText(xmlPath, BuildIdleXml(exePath, time, user, DateTime.Now.Date), Encoding.Unicode);
+                int code = Run("/Create /XML \"" + xmlPath + "\" /TN \"" + IdleTaskName + "\" /F");
+                if (code != 0) return "schtasks вернул код " + code;
+                return IsIdleInstalled() ? null : "задача создана, но не найдена при проверке";
+            }
+            catch (Exception ex) { return ex.Message; }
+            finally { if (xmlPath != null) TryDelete(xmlPath); }
+        }
+
+        public static bool IsIdleInstalled() => Run("/Query /TN \"" + IdleTaskName + "\"") == 0;
+        public static string UninstallIdle()
+        {
+            try { int code = Run("/Delete /TN \"" + IdleTaskName + "\" /F"); return code == 0 || !IsIdleInstalled() ? null : "schtasks вернул код " + code; }
+            catch (Exception ex) { return ex.Message; }
+        }
+
+        internal static string BuildIdleXml(string exePath, TimeSpan time, string user, DateTime day)
+        {
+            if (time < TimeSpan.Zero || time >= TimeSpan.FromDays(1)) throw new ArgumentOutOfRangeException(nameof(time));
+            XDocument doc = XDocument.Parse(BuildXmlForUser(exePath, 0, user));
+            XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+            var root = doc.Root;
+            root.Element(ns + "RegistrationInfo").Element(ns + "Description").Value = "CacheTrim: ежедневная очистка при простое и питании от сети";
+            root.Element(ns + "RegistrationInfo").Element(ns + "URI").Value = "\\" + IdleTaskName;
+            root.Element(ns + "Triggers").ReplaceNodes(new XElement(ns + "CalendarTrigger",
+                new XElement(ns + "StartBoundary", day.Date.Add(time).ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)),
+                new XElement(ns + "Enabled", "true"), new XElement(ns + "ScheduleByDay", new XElement(ns + "DaysInterval", "1"))));
+            var settings = root.Element(ns + "Settings");
+            settings.Element(ns + "RunOnlyIfIdle").Value = "true";
+            settings.Element(ns + "DisallowStartIfOnBatteries").Value = "true";
+            // Never terminate a cleaner mid-operation (e.g. while a Windows service is stopped).
+            settings.Element(ns + "ExecutionTimeLimit").Value = "PT0S";
+            settings.Element(ns + "IdleSettings").Element(ns + "StopOnIdleEnd").Value = "false";
+            using var writer = new StringWriter(CultureInfo.InvariantCulture);
+            doc.Save(writer); return writer.ToString();
+        }
+
+        private static string BuildXml(string exePath, int delaySeconds) => BuildXmlForUser(exePath, delaySeconds, WindowsIdentity.GetCurrent().Name);
+        private static string BuildXmlForUser(string exePath, int delaySeconds, string user)
+        {
             string delay = "PT" + Math.Max(0, delaySeconds) + "S";
 
             StringBuilder sb = new StringBuilder();

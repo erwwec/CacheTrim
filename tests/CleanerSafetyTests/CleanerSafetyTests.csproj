@@ -3,6 +3,8 @@
   <ItemGroup>
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
     <Compile Include="../../winui/Core/Cleaner.cs" Link="Cleaner.cs" />
+    <Compile Include="../../winui/Core/CleanupOptions.cs" Link="CleanupOptions.cs" />
+    <Compile Include="../../winui/Core/GameGuard.cs" Link="GameGuard.cs" />
     <Compile Include="../../winui/Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
   </ItemGroup>
 </Project>

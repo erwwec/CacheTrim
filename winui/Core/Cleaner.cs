@@ -16,10 +16,46 @@ namespace CacheTrim
         private long _bytes;
         private int _files;
         private int _skipped;
+        private readonly CleanupOptions _options;
+        private readonly GameGuard _gameGuard;
+        private bool _preview;
+        private string _category = "temp";
+        private DateTime? _categoryCutoff;
+        public readonly List<string> PreviewPaths = new List<string>();
+        private const int PreviewPathLimit = 3000;
 
-        public Cleaner(Action<string> log)
+        public Cleaner(Action<string> log, CleanupOptions options = null)
         {
             _log = log;
+            _options = options ?? CleanupOptions.Load();
+            _options.Validate();
+            _gameGuard = new GameGuard();
+        }
+
+        public void Preview(Config c) { _preview = true; try { Run(c); } finally { _preview = false; } }
+        private void Category(string category)
+        {
+            _category = category;
+            int hours = _options.AgeFor(category);
+            _categoryCutoff = hours > 0 ? DateTime.UtcNow.AddHours(-hours) : (DateTime?)null;
+        }
+        private DateTime? EffectiveCutoff(DateTime? cutoff)
+        {
+            if (!_categoryCutoff.HasValue) return cutoff;
+            return !cutoff.HasValue || _categoryCutoff.Value < cutoff.Value ? _categoryCutoff : cutoff;
+        }
+        private void HandleFile(FileInfo info)
+        {
+            if (_options.IsExcluded(info.FullName)) { _skipped++; return; }
+            if (_categoryCutoff.HasValue && info.LastWriteTimeUtc >= _categoryCutoff.Value) return;
+            long length = info.Length;
+            if (_preview)
+            {
+                if (PreviewPaths.Count < PreviewPathLimit) PreviewPaths.Add(_category + " | " + info.FullName);
+            }
+            else DeleteFilePreservingAttributes(info);
+            _bytes += length;
+            _files++;
         }
 
         public long BytesFreed { get { return _bytes; } }
@@ -28,56 +64,71 @@ namespace CacheTrim
 
         public void Run(Config c)
         {
+            if (!_preview) _gameGuard.Check(true);
+            using FileStream runLock = _preview ? null : AcquireRunLock();
             DateTime? tempAge = c.TempAgeHours > 0
                 ? (DateTime?)DateTime.UtcNow.AddHours(-c.TempAgeHours)
                 : null;
 
             if (c.Temp)
-                CleanTemp(tempAge);
+            { Category("temp"); CleanTemp(tempAge); }
 
             if (c.Wer)
-                CleanWer();
+            { Category("reports"); CleanWer(); }
 
             if (c.Browsers)
-                CleanBrowsers();
+            { Category("browsers"); CleanBrowsers(); }
 
             if (c.D3dCache)
-                CleanShaderCache();
+            { Category("shaders"); CleanShaderCache(); }
 
             if (c.Thumbs)
-                CleanThumbnails();
+            { Category("thumbnails"); CleanThumbnails(); }
 
             if (c.Dumps)
-                CleanDumps();
+            { Category("dumps"); CleanDumps(); }
 
             if (c.WinLogs)
-                CleanWindowsLogs();
+            { Category("logs"); CleanWindowsLogs(); }
 
             if (c.UwpCache)
-                CleanUwpCaches();
+            { Category("uwp"); CleanUwpCaches(); }
 
             if (c.Prefetch)
             {
+                Category("prefetch");
                 _log("-- prefetch (файлы старше 7 дней)");
                 string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
                 Sweep(Path.Combine(windir, "Prefetch"), DateTime.UtcNow.AddDays(-7), "*");
             }
 
             if (c.UpdateCache)
-                CleanWindowsUpdate();
+            { Category("updates"); CleanWindowsUpdate(); }
 
-            if (c.Dns || c.Arp || c.Netbios)
+            if (!_preview) _gameGuard.Check(true);
+            if (!_preview && (c.Dns || c.Arp || c.Netbios))
                 CleanNetwork(c);
 
-            if (c.Recycle)
+            if (c.Recycle && !_preview)
             {
-                _log(Native.EmptyRecycleBin() ? "-- корзина очищена" : "-- корзина: уже пуста или недоступна");
+                _gameGuard.Check(true);
+                // Windows empties the whole recycle bin, bypassing path exclusions.
+                if (_options.ExcludedPaths.Count > 0) _log("-- корзина пропущена: включены исключения");
+                else _log(Native.EmptyRecycleBin() ? "-- корзина очищена" : "-- корзина: уже пуста или недоступна");
             }
 
-            PurgeMemory(c);
+            if (!_preview) { _gameGuard.Check(true); PurgeMemory(c); }
 
-            _log(string.Format("-- итого: {0}, файлов {1}, пропущено занятых {2}",
+            _log(string.Format(_preview ? "-- предпросмотр: {0}, файлов {1}, пропущено {2}" : "-- итого: {0}, файлов {1}, пропущено {2}",
                 FormatBytes(_bytes), _files, _skipped));
+        }
+
+        private static FileStream AcquireRunLock()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CacheTrim");
+            Directory.CreateDirectory(dir);
+            try { return new FileStream(Path.Combine(dir, "clean.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+            catch (IOException ex) { throw new InvalidOperationException("Очистка уже выполняется или файл блокировки недоступен.", ex); }
         }
 
         // ---------------- disk sections ----------------
@@ -210,8 +261,10 @@ namespace CacheTrim
             // Only downloaded update files are touched, never the BITS job database or component store.
             bool restartWua;
             bool restartBits;
-            bool wuaStopped = StopService("wuauserv", out restartWua);
-            bool bitsStopped = StopService("bits", out restartBits);
+            restartWua = false; restartBits = false;
+            if (!_preview) _gameGuard.Check(true);
+            bool wuaStopped = _preview || StopService("wuauserv", out restartWua);
+            bool bitsStopped = _preview || StopService("bits", out restartBits);
             try
             {
                 if (!wuaStopped || !bitsStopped)
@@ -287,8 +340,10 @@ namespace CacheTrim
 
         private void Sweep(string root, DateTime? olderThanUtc, string pattern)
         {
-            if (!Directory.Exists(root))
+            if (!_preview) _gameGuard.Check();
+            if (!Directory.Exists(root) || _options.IsExcluded(root))
                 return;
+            olderThanUtc = EffectiveCutoff(olderThanUtc);
 
             try
             {
@@ -315,6 +370,7 @@ namespace CacheTrim
 
             while (stack.Count > 0)
             {
+                if (!_preview) _gameGuard.Check();
                 string dir = stack.Pop();
                 dirs.Add(dir);
 
@@ -330,6 +386,7 @@ namespace CacheTrim
 
                 foreach (string file in files)
                 {
+                    if (!_preview) _gameGuard.Check();
                     try
                     {
                         FileInfo info = new FileInfo(file);
@@ -339,10 +396,7 @@ namespace CacheTrim
                         if (olderThanUtc.HasValue && info.LastWriteTimeUtc >= olderThanUtc.Value)
                             continue;
 
-                        long length = info.Length;
-                        DeleteFilePreservingAttributes(info);
-                        _bytes += length;
-                        _files++;
+                        HandleFile(info);
                     }
                     catch (Exception)
                     {
@@ -364,7 +418,7 @@ namespace CacheTrim
                 {
                     try
                     {
-                        if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
+                        if (_options.IsExcluded(sub) || (File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
                         {
                             _skipped++;
                             continue;
@@ -378,9 +432,12 @@ namespace CacheTrim
                 }
             }
 
+            // Preview is read-only, including empty directories.
+            if (_preview) return;
             // Deepest first so parents are empty by the time we try them.
             for (int i = dirs.Count - 1; i >= 0; i--)
             {
+                _gameGuard.Check();
                 try
                 {
                     if (string.Equals(dirs[i], root, StringComparison.OrdinalIgnoreCase))
@@ -397,16 +454,17 @@ namespace CacheTrim
 
         private void DeleteFile(string path)
         {
+            if (!_preview) _gameGuard.Check();
             try
             {
                 FileInfo info = new FileInfo(path);
-                if (!info.Exists)
-                    return;
-
-                long length = info.Length;
-                DeleteFilePreservingAttributes(info);
-                _bytes += length;
-                _files++;
+                if (!info.Exists) return;
+                // A direct file target must not bypass the same junction protection as Sweep.
+                for (DirectoryInfo directory = info.Directory; directory != null; directory = directory.Parent)
+                {
+                    if ((directory.Attributes & FileAttributes.ReparsePoint) != 0) { _skipped++; return; }
+                }
+                HandleFile(info);
             }
             catch (Exception)
             {
@@ -447,28 +505,30 @@ namespace CacheTrim
             return paths;
         }
 
-        private static IEnumerable<string> BrowserCacheDirs()
+        private IEnumerable<string> BrowserCacheDirs()
         {
             List<string> result = new List<string>();
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-            string[] roots =
+            var roots = new Dictionary<string, string>
             {
-                Path.Combine(local, @"Google\Chrome\User Data"),
-                Path.Combine(local, @"Microsoft\Edge\User Data"),
-                Path.Combine(local, @"BraveSoftware\Brave-Browser\User Data"),
-                Path.Combine(local, @"Vivaldi\User Data"),
-                Path.Combine(local, @"Chromium\User Data"),
-                Path.Combine(local, @"Yandex\YandexBrowser\User Data"),
-                Path.Combine(roaming, @"Opera Software\Opera Stable")
+                ["Chrome"] = Path.Combine(local, @"Google\Chrome\User Data"),
+                ["Edge"] = Path.Combine(local, @"Microsoft\Edge\User Data"),
+                ["Brave"] = Path.Combine(local, @"BraveSoftware\Brave-Browser\User Data"),
+                ["Vivaldi"] = Path.Combine(local, @"Vivaldi\User Data"),
+                ["Chromium"] = Path.Combine(local, @"Chromium\User Data"),
+                ["Yandex"] = Path.Combine(local, @"Yandex\YandexBrowser\User Data"),
+                ["Opera"] = Path.Combine(roaming, @"Opera Software\Opera Stable")
             };
 
             string[] profiles = { "Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Guest Profile" };
             string[] subdirs = { "Cache", @"Code Cache", "GPUCache", @"Service Worker\CacheStorage", "DawnCache", "GrShaderCache" };
 
-            foreach (string root in roots)
+            foreach (var browser in roots)
             {
+                if (!_options.IncludesBrowser(browser.Key)) continue;
+                string root = browser.Value;
                 if (!Directory.Exists(root))
                     continue;
 

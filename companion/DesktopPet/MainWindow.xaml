@@ -45,6 +45,7 @@
                     <Slider x:Name="JumpSlider" Minimum="0.5" Maximum="2" Value="1" Width="205"
                             ValueChanged="JumpSlider_ValueChanged" Margin="0,0,0,3" />
                     <Button x:Name="QuietButton" Content="Не отвлекать: выкл" Click="Quiet_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="BringSecretButton" Content="Принеси секрет" Click="BringSecret_Click" Margin="0,2" Padding="6,3" />
                     <Button x:Name="SurpriseButton" Content="Секреты: вкл" Click="Surprise_Click" Margin="0,2" Padding="6,3" />
                     <Button x:Name="SeatButton" Content="Место: свободно" Click="Seat_Click" Margin="0,2" Padding="6,3" />
                     <Button x:Name="CollectionButton" Content="Коллекция: вкл" Click="Collection_Click" Margin="0,2" Padding="6,3" />
@@ -55,6 +56,8 @@
                     <Button Content="Сохранить фразы" Click="SavePhrases_Click" Margin="0,3" Padding="6,3" />
                     <Button Content="Прыгнуть" Click="Jump_Click" Margin="0,2" Padding="6,3" />
                     <Button x:Name="AudioButton" Content="Реакция на звук: вкл" Click="Audio_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="LyricsButton" Content="Текст песни: выкл" Click="Lyrics_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="LyricsStatusButton" Content="Почему нет текста песни?" Click="LyricsStatus_Click" Margin="0,2" Padding="6,3" />
                     <Button Content="Выход" Click="Exit_Click" Margin="0,2" Padding="6,3" />
                 </StackPanel>
               </Border>

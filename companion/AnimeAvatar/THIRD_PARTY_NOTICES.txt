@@ -1,0 +1,74 @@
+ANIME AVATAR V4 — ARTWORK AND THIRD-PARTY NOTICES
+
+CURRENT RUNTIME ARTWORK
+V15 adds two restrained torso-turn poses and matching blink edits generated
+with the built-in image_gen tool on 12 November 2026. Exact prompts and
+transparent source PNGs are in assets/v15. The preparation script registers
+the feet and crops the authored blink regions. Existing eye artwork is
+registered and composited at runtime by EyeOverlay.cs without cutting holes
+in the original face.
+
+V14 refines three existing poses (rear-facing rest, stretch and wave) with
+the built-in image_gen tool on 12 November 2026. Generated transparent
+sources and exact prompts are retained in assets/v14. tools/pack_v14.ps1
+only rescales them uniformly and registers the existing ground contacts.
+The original pose images remain in their prior version directories.
+
+V12 adds 28 small gaze layers derived from six atlases generated with the
+built-in imagegen tool using this project's existing character as reference.
+Exact prompts and source hashes are retained in assets/v12 and the release's
+artwork/v12-prompt-set.txt and v12-provenance.json. Packing uses source-pixel
+cropping, resampling, registration and a narrow edge blend. No pupils or body
+parts were manually painted. Supporting body artwork is unchanged outside the
+declared eye/head replacement regions.
+
+The teal-haired 2D character and its pose/expression sheets were generated for
+this project with the built-in imagegen tool on 11 November 2026. The supplied
+video was used to understand the general 2D anime desktop-companion style.
+No ThatPet character pack, Desktop Mate model, or other third-party character
+artwork was copied into the V4 executable.
+
+Generated source sheets are retained in assets/v4. The prompt set and mechanical
+packing provenance are included in this release under artwork/.
+The atlas-preparation tool performs grid slicing, uniform resizing and canvas
+placement while retaining the generated alpha; it does not redraw or recolour
+the character. Generated art may not be unique.
+
+V10 adds two wall-seated leg variations and four independent gaze drawings,
+also created with the built-in imagegen tool on 11 November 2026 using this
+project's original wall-sitting character as the reference. Generated source
+images and exact prompts are retained in assets/v10. Packing uses transparent
+cropping, uniform resampling and registration with the original collar seam;
+it does not paint replacement eyes or bend the illustrated limbs.
+
+V11 adds four authored conversational gestures and six wall-speaking mouth
+variants generated with the built-in imagegen tool. The generated mouth regions
+are mechanically registered over the original heads so their hair and eyes do
+not change between syllables. Three older talk frames are normalized using their
+original authored mouth pixels. Sources and prompts are retained in assets/v11.
+
+The C# JARVIS plugin SDK bridge is retained unchanged from the user's installed
+JARVIS PRO plugin-sdk/JarvisPlugin.cs. Windows/.NET components are supplied by the
+operating system and are not redistributed here.
+
+HISTORICAL V2/V3 MODEL — NOT EMBEDDED OR LOADED IN V4
+Earlier releases used pixiv Inc.'s VRM1_Constraint_Twist_Sample v1.0.1 under the
+VRM Public License 1.0 and its embedded permissions. Those original files and
+license metadata remain in redesign/reference-assets and the archived V3
+package. The old 3D model is not part of the current 2D runtime package.
+Official source:
+https://github.com/vrm-c/vrm-specification/tree/master/samples/VRM1_Constraint_Twist_Sample
+License: https://vrm.dev/licenses/1.0/
+
+VISUAL REFERENCES — NOT DISTRIBUTED AS APPLICATION ASSETS
+The user supplied document_5449699378430258141.mp4, a ThatPet promotional clip.
+ThatPet's public pack description informed only the general pose-based approach.
+https://thatpet.app/packs
+https://thatpet.app/terms
+Reference images/videos are not included in the release ZIP.
+
+
+V15.0.0.14: full-body shy hair-twirl drawings generated with built-in image_gen
+using the existing idle artwork as reference. Prompts retained in assets/v15/source.
+
+V15.0.0.15: full-body blink, gaze and speech drawings generated with built-in imagegen using existing artwork as reference. Sources and prompts are in assets/v15/source/complete-*.

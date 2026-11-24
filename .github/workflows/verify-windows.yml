@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety']
+    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics']
   pull_request:
     branches: [main]
 
@@ -44,3 +44,43 @@ jobs:
           dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
           if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
           .\tests\SmokePet.ps1
+      - name: Test synchronized lyrics timing
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\LyricsTests\LyricsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Lyrics timing tests failed' }
+      - name: Test file review scans
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\FileReviewTests\FileReviewTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'File review tests failed' }
+      - name: Test cleanup schedule definition
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\TaskSetupTests\TaskSetupTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Schedule definition tests failed' }
+      - name: Test cleanup presets
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CleanupPresetsTests\CleanupPresetsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleanup preset tests failed' }
+      - name: Test network diagnostics input
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\NetworkDiagnosticsTests\NetworkDiagnosticsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Network diagnostics input tests failed' }
+      - name: Test display diagnostics filtering
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\DisplayDiagnosticsTests\DisplayDiagnosticsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Display diagnostics tests failed' }
+      - name: Test pet speech bubble state
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\PetUiTests\PetUiTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Pet speech bubble tests failed' }
+      - name: Test update download safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }

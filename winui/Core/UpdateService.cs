@@ -24,6 +24,7 @@ internal sealed class UpdateInfo
 internal static class UpdateService
 {
     private static readonly HttpClient Client = new();
+    private const long MaxAppUpdateBytes = 512L * 1024 * 1024;
 
     static UpdateService()
     {
@@ -98,13 +99,18 @@ internal static class UpdateService
             using HttpRequestMessage request = new(HttpMethod.Get, update.DownloadUrl);
             using HttpResponseMessage response = Client.Send(request, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength.Value > MaxAppUpdateBytes)
+                throw new InvalidDataException("Файл обновления превышает допустимый размер.");
             using Stream source = response.Content.ReadAsStream();
             using FileStream output = new(stagedExe, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 256);
             using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             byte[] buffer = new byte[1024 * 256];
             int read;
+            long total = 0;
             while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
             {
+                total += read;
+                if (total > MaxAppUpdateBytes) throw new InvalidDataException("Файл обновления превышает допустимый размер.");
                 output.Write(buffer, 0, read);
                 hash.AppendData(buffer, 0, read);
             }
@@ -119,13 +125,10 @@ internal static class UpdateService
             throw;
         }
 
-        using (FileStream check = File.OpenRead(stagedExe))
+        if (!HasWindowsExecutableHeader(stagedExe))
         {
-            if (check.ReadByte() != 'M' || check.ReadByte() != 'Z')
-            {
-                File.Delete(stagedExe);
-                throw new InvalidDataException("Загруженный файл не похож на исполняемый файл Windows.");
-            }
+            File.Delete(stagedExe);
+            throw new InvalidDataException("Загруженный файл не похож на исполняемый файл Windows.");
         }
         string checksumText;
         try
@@ -266,6 +269,13 @@ internal static class UpdateService
             try { if (File.Exists(staged)) File.Delete(staged); }
             catch { }
         }
+    }
+
+    internal static bool HasWindowsExecutableHeader(string path)
+    {
+        // Close the handle before the caller tries to delete a rejected download on Windows.
+        using FileStream check = File.OpenRead(path);
+        return check.ReadByte() == 'M' && check.ReadByte() == 'Z';
     }
 
     private static void RequireGitHubUrl(string value)

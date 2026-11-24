@@ -624,6 +624,7 @@ public partial class MainWindow : Window
 
     private async Task PurgeMemoryAsync()
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!Confirm("Очистка памяти", "Windows освободит выбранные списки страниц. Это не удаляет пользовательские файлы.")) return;
         await RunBusyAsync("очищается память…", async () =>
         {
@@ -708,6 +709,12 @@ public partial class MainWindow : Window
         });
         WrapPanel actions = new();
         actions.Children.Add(Action("Сохранить настройки", () => SaveConfig(c, "настройки сохранены", "настройки очистки сохранены"), true));
+        actions.Children.Add(Action("Предпросмотр очистки", async () => await PreviewCleanupAsync(c.Clone())));
+        actions.Children.Add(Action("Исключения и правила", ShowCleanupOptions));
+        actions.Children.Add(Action("Наборы очистки", ShowCleanupPresets));
+        actions.Children.Add(Action("Поиск файлов", ShowFileReview));
+        actions.Children.Add(Action("Защита во время игр", ShowGameGuard));
+        actions.Children.Add(Action("Расписание очистки", ShowIdleSchedule));
         actions.Children.Add(Action("Запустить очистку", async () => await RunCleanerAsync(c.Clone())));
         _cleanLeftColumn = null;
         _cleanRightColumn = null;
