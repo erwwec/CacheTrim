@@ -1,0 +1,65 @@
+name: Publish CacheTrim v2.1.13
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'Release CacheTrim v2.1.13')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build CacheTrim
+        shell: pwsh
+        run: |
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\verify
+          if ($LASTEXITCODE -ne 0) { throw 'CacheTrim publish failed' }
+          $exe = Get-Item .\dist\verify\CacheTrim.exe
+          if ($exe.VersionInfo.FileVersion -ne '2.1.13.0') { throw 'Unexpected CacheTrim version' }
+      - name: Test update detection and window
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\WhatsNewTests\WhatsNewTests.csproj -c Release -- .\dist\verify\CacheTrim.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Update detection failed' }
+          .\tests\SmokeWhatsNew.ps1
+          .\tests\SmokeGlass.ps1
+      - name: Build Desktop Pet and checksums
+        shell: pwsh
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
+          Copy-Item .\dist\verify\CacheTrim.exe .\dist\CacheTrim.exe -Force
+          Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
+          foreach ($name in @('CacheTrim.exe', 'DesktopPet.exe')) {
+            $path = Join-Path '.\dist' $name
+            $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -Path ($path + '.sha256') -Value $hash -NoNewline -Encoding ASCII
+          }
+      - name: Create draft and upload tested files
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.13
+          target_commitish: ${{ github.sha }}
+          name: v2.1.13
+          draft: true
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/CacheTrim.exe
+            dist/CacheTrim.exe.sha256
+            dist/DesktopPet.exe
+            dist/DesktopPet.exe.sha256
+      - name: Publish release after uploads
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.13
+          target_commitish: ${{ github.sha }}
+          name: v2.1.13
+          draft: false
+          body_path: RELEASE_NOTES.md
