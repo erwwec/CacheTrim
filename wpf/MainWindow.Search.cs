@@ -40,6 +40,8 @@ public partial class MainWindow
         var root = new DockPanel { Margin = new Thickness(18) };
         var query = new System.Windows.Controls.TextBox { FontSize = 15, Padding = new Thickness(8), ToolTip = "Название функции или ключевые слова" };
         DockPanel.SetDock(query, Dock.Top); root.Children.Add(query);
+        var openButton = new System.Windows.Controls.Button { Content = "Открыть раздел", Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
+        DockPanel.SetDock(openButton, Dock.Bottom); root.Children.Add(openButton);
         var results = new System.Windows.Controls.ListBox { Margin = new Thickness(0, 10, 0, 0) }; root.Children.Add(results);
         void Refresh() {
             var words = query.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -53,6 +55,7 @@ public partial class MainWindow
         }
         query.TextChanged += (_, _) => Refresh();
         query.KeyDown += (_, e) => { if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; } else if (e.Key == Key.Down && results.Items.Count > 0) { results.Focus(); } };
+        openButton.Click += (_, _) => OpenSelected();
         results.MouseDoubleClick += (_, _) => OpenSelected();
         results.KeyDown += (_, e) => { if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; } };
         window.Content = root; Refresh(); window.Loaded += (_, _) => query.Focus(); window.ShowDialog();
