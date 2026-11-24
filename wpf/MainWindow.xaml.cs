@@ -708,6 +708,8 @@ public partial class MainWindow : Window
         });
         WrapPanel actions = new();
         actions.Children.Add(Action("Сохранить настройки", () => SaveConfig(c, "настройки сохранены", "настройки очистки сохранены"), true));
+        actions.Children.Add(Action("Предпросмотр очистки", async () => await PreviewCleanupAsync(c.Clone())));
+        actions.Children.Add(Action("Исключения и правила", ShowCleanupOptions));
         actions.Children.Add(Action("Запустить очистку", async () => await RunCleanerAsync(c.Clone())));
         _cleanLeftColumn = null;
         _cleanRightColumn = null;
