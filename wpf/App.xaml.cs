@@ -37,8 +37,11 @@ public partial class App : Application
         MainWindow window = new(page);
         MainWindow = window;
         window.Show();
+        bool hasUpdateArgument = !string.IsNullOrWhiteSpace(updatedFrom);
+        if (!hasUpdateArgument)
+            updatedFrom = WhatsNewState.FindLegacyPreviousVersion(Environment.ProcessPath, AppInfo.Version);
         if (!string.IsNullOrWhiteSpace(updatedFrom))
-            window.ShowWhatsNew(updatedFrom);
+            window.ShowWhatsNew(updatedFrom, hasUpdateArgument);
     }
 
     internal static void Log(string message)
