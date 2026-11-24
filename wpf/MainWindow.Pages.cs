@@ -228,6 +228,7 @@ public partial class MainWindow
 
     private async Task ResetNetworkAsync()
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!ConfirmRisk("Сброс сетевых настроек", "Сбросит Winsock и TCP/IP, очистит DNS-кэш и может отключить пользовательские настройки VPN или статического IP. После операции перезагрузите компьютер.")) return;
         await RunBusyAsync("сбрасываются сетевые настройки…", async () =>
         {
@@ -275,6 +276,7 @@ public partial class MainWindow
 
     private async Task RunAdvancedCommandAsync(string title, string warning, string busy, string executable, string arguments, int timeoutMilliseconds)
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!ConfirmRisk(title, warning)) return;
         await RunBusyAsync(busy, async () =>
         {
@@ -315,6 +317,7 @@ public partial class MainWindow
 
     private async Task RestoreWindowsImageAsync()
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!ConfirmRisk("Восстановление компонентов Windows", "DISM проверит хранилище компонентов и при необходимости скачает замену через Windows Update. Операция может занять много времени.")) return;
         await RunBusyAsync("восстанавливаются компоненты Windows…", async () =>
         {
@@ -333,6 +336,7 @@ public partial class MainWindow
 
     private async Task RunDiskMaintenanceAsync()
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!Confirm("Оптимизация дисков", "Windows выберет подходящую операцию для каждого фиксированного диска. Запустить?")) return;
         await RunBusyAsync("обслуживание дисков…", async () =>
         {
@@ -347,6 +351,7 @@ public partial class MainWindow
 
     private async Task RunSfcAsync()
     {
+        try { new GameGuard().Check(true); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Обслуживание приостановлено", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         if (!Confirm("Проверка Windows", "Запустить sfc /scannow? Это может занять несколько минут.")) return;
         await RunBusyAsync("проверяются системные файлы…", async () =>
         {
