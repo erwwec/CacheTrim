@@ -112,7 +112,11 @@ public partial class MainWindow
         using var input = typeof(MainWindow).Assembly.GetManifestResourceStream("CacheTrim.AnimeAvatar.Notices.txt");
         if (input == null) { MessageBox.Show(this, "Сведения об аватаре недоступны.", "Аниме-аватар"); return; }
         using var reader = new StreamReader(input);
-        MessageBox.Show(this, reader.ReadToEnd(), "Сведения об аниме-аватаре", MessageBoxButton.OK, MessageBoxImage.Information);
+        var details = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brush(Theme.Bg), Foreground = Brush(Theme.Text), Padding = new Thickness(16) };
+        var window = new Window { Title = "Сведения об аниме-аватаре", Width = 700, Height = 520, Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = details };
+        window.ShowDialog();
     }
 
     private async Task LaunchAnimeAvatarAsync()
