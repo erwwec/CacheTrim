@@ -29,12 +29,14 @@ public partial class MainWindow : Window
     private static readonly ImageSource SleepSprite = LoadSprite("claude_sleep.png");
 
     private readonly DispatcherTimer _motionTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
-    private readonly DispatcherTimer _lyricsTimer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
+    private readonly DispatcherTimer _lyricsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private LyricsService? _lyricsService;
     private CancellationTokenSource _lyricsCancellation = new();
     private bool _lyricsEnabled;
     private bool _lyricsBusy;
     private string _lyricsLastLine = "";
+    private bool _speechIsLyrics;
+    private DateTime _nextLyricsAttemptAt = DateTime.MinValue;
     private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _platformScanTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private readonly Random _random = new();
@@ -265,6 +267,7 @@ public partial class MainWindow : Window
             SpeechBubble.Visibility = Visibility.Collapsed;
             ThoughtDotLarge.Visibility = Visibility.Collapsed;
             ThoughtDotSmall.Visibility = Visibility.Collapsed;
+            _speechIsLyrics = false;
         }
     }
 
@@ -514,8 +517,9 @@ public partial class MainWindow : Window
 
     private void Loopback_DataAvailable(object? sender, WaveInEventArgs e)
     {
-        var format = _loopbackCapture?.WaveFormat;
-        if (format is null || e.BytesRecorded == 0) return;
+        var capture = _loopbackCapture;
+        if (capture is null || !ReferenceEquals(sender, capture) || e.BytesRecorded == 0) return;
+        var format = capture.WaveFormat;
         var bytesPerSample = (format.BitsPerSample + 7) / 8;
         if (bytesPerSample is < 2 or > 4) return;
         var isFloat = format.Encoding == WaveFormatEncoding.IeeeFloat ||
@@ -541,7 +545,7 @@ public partial class MainWindow : Window
             sum += sample * sample;
             count++;
         }
-        if (count > 0) Interlocked.Exchange(ref _pendingAudioLevel, Math.Sqrt(sum / count));
+        if (count > 0 && ReferenceEquals(capture, _loopbackCapture)) Interlocked.Exchange(ref _pendingAudioLevel, Math.Sqrt(sum / count));
     }
 
     private void UpdateMusicComments()
@@ -571,13 +575,25 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowSpeech(string text)
+    private void ShowSpeech(string text, bool isLyrics = false)
     {
+        _speechIsLyrics = isLyrics;
         SpeechText.Text = text;
         SpeechBubble.Visibility = Visibility.Visible;
         ThoughtDotLarge.Visibility = Visibility.Visible;
         ThoughtDotSmall.Visibility = Visibility.Visible;
         _speechEndsAt = DateTime.UtcNow.AddSeconds(6);
+    }
+
+    private void HideLyricSpeech()
+    {
+        _lyricsLastLine = "";
+        if (!_speechIsLyrics) return;
+        _speechIsLyrics = false;
+        SpeechBubble.Visibility = Visibility.Collapsed;
+        ThoughtDotLarge.Visibility = Visibility.Collapsed;
+        ThoughtDotSmall.Visibility = Visibility.Collapsed;
+        _speechEndsAt = DateTime.MinValue;
     }
 
     private void Pet_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -707,6 +723,7 @@ public partial class MainWindow : Window
         }
         else
         {
+            Interlocked.Exchange(ref _pendingAudioLevel, 0);
             if (!StartAudioCapture())
             {
                 AudioButton.Content = "Звук недоступен — нажми";
@@ -725,6 +742,7 @@ public partial class MainWindow : Window
             var result = MessageBox.Show(this, "Чтобы найти синхронизированный текст, название песни, исполнитель, альбом и длительность (если доступны) будут отправлены сервису LRCLIB через интернет. Аудиозапись не отправляется. Работает только с совместимыми медиаплеерами и не для всех песен. Включить?", "Текст песни", MessageBoxButton.YesNo, MessageBoxImage.Information);
             if (result != MessageBoxResult.Yes) return;
             _lyricsEnabled = true;
+            _nextLyricsAttemptAt = DateTime.MinValue;
             _lyricsTimer.Start();
         }
         else
@@ -734,8 +752,9 @@ public partial class MainWindow : Window
             _lyricsCancellation.Cancel();
             _lyricsCancellation.Dispose();
             _lyricsCancellation = new CancellationTokenSource();
-            _lyricsLastLine = "";
-            if (SpeechText.Text.Length > 0) SpeechBubble.Visibility = Visibility.Collapsed;
+            _lyricsService?.Dispose();
+            _lyricsService = null;
+            HideLyricSpeech();
         }
         LyricsButton.Content = _lyricsEnabled ? "Текст песни: вкл" : "Текст песни: выкл";
         SaveSettings();
@@ -743,7 +762,7 @@ public partial class MainWindow : Window
 
     private async void Lyrics_Tick(object? sender, EventArgs e)
     {
-        if (!_lyricsEnabled || _quietMode || _lyricsBusy || _isClosing) return;
+        if (!_lyricsEnabled || _quietMode || _lyricsBusy || _isClosing || DateTime.UtcNow < _nextLyricsAttemptAt) return;
         _lyricsBusy = true;
         var token = _lyricsCancellation.Token;
         try
@@ -751,16 +770,16 @@ public partial class MainWindow : Window
             _lyricsService ??= new LyricsService();
             string? line = await _lyricsService.CurrentLineAsync(token);
             if (token.IsCancellationRequested || !_lyricsEnabled || _quietMode || _isClosing) return;
-            if (string.IsNullOrWhiteSpace(line)) { _lyricsLastLine = ""; return; }
+            if (string.IsNullOrWhiteSpace(line)) { HideLyricSpeech(); return; }
             if (line.Length > 180) line = line[..180] + "…";
-            if (line != _lyricsLastLine || SpeechBubble.Visibility != Visibility.Visible || SpeechText.Text != line)
+            if (line != _lyricsLastLine || !_speechIsLyrics || SpeechBubble.Visibility != Visibility.Visible || SpeechText.Text != line)
             {
                 _lyricsLastLine = line;
-                ShowSpeech(line);
+                ShowSpeech(line, isLyrics: true);
             }
             _speechEndsAt = DateTime.UtcNow.AddSeconds(3);
         }
-        catch (Exception) { /* Optional feature must never crash the pet on network or media errors. */ }
+        catch (Exception) { if (!token.IsCancellationRequested && !_isClosing) { HideLyricSpeech(); _nextLyricsAttemptAt = DateTime.UtcNow.AddSeconds(5); } }
         finally { _lyricsBusy = false; }
     }
 
@@ -790,6 +809,8 @@ public partial class MainWindow : Window
             SpeechBubble.Visibility = Visibility.Collapsed;
             ThoughtDotLarge.Visibility = Visibility.Collapsed;
             ThoughtDotSmall.Visibility = Visibility.Collapsed;
+            _speechIsLyrics = false;
+            _lyricsLastLine = "";
         }
         SaveSettings();
     }
@@ -867,7 +888,7 @@ public partial class MainWindow : Window
 
     private static double ParseSetting(string[] values, int index, double fallback, double min, double max) =>
         values.Length > index && double.TryParse(values[index], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
-            ? Math.Clamp(parsed, min, max) : fallback;
+            && double.IsFinite(parsed) ? Math.Clamp(parsed, min, max) : fallback;
 
     private void SaveSettings()
     {
