@@ -1,0 +1,29 @@
+name: Verify Windows build
+
+on:
+  push:
+    branches: [main, 'fix/liquid-glass-wpf']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish Windows executable
+        shell: pwsh
+        run: |
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\verify
+          if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
+      - name: Check update-notes detection on Windows
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\WhatsNewTests\WhatsNewTests.csproj -c Release -- .\dist\verify\CacheTrim.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Update-notes checks failed' }
