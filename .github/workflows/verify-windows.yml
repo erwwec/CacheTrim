@@ -79,3 +79,8 @@ jobs:
         run: |
           dotnet run --project .\tests\PetUiTests\PetUiTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Pet speech bubble tests failed' }
+      - name: Test update download safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }

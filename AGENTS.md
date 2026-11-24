@@ -19,7 +19,7 @@ CacheTrim — настольное приложение Windows для очис�
 ## Проверка и выпуск
 
 1. Проверь текущие `main`, открытые ветки и последнюю версию релиза перед изменениями.
-2. Собирай WPF и Desktop Pet под Windows, запускай `tests/WhatsNewTests`, `tests/CleanerSafetyTests`, `tests/FileReviewTests`, `tests/TaskSetupTests`, `tests/CleanupPresetsTests`, `tests/NetworkDiagnosticsTests`, `tests/DisplayDiagnosticsTests`, `tests/LyricsTests`, `tests/PetUiTests` и Windows smoke-проверки. Проверки GitHub Actions не заменяют визуального тестирования и тестов на реальных устройствах.
+2. Собирай WPF и Desktop Pet под Windows, запускай `tests/WhatsNewTests`, `tests/CleanerSafetyTests`, `tests/FileReviewTests`, `tests/TaskSetupTests`, `tests/CleanupPresetsTests`, `tests/NetworkDiagnosticsTests`, `tests/DisplayDiagnosticsTests`, `tests/LyricsTests`, `tests/PetUiTests`, `tests/UpdateSafetyTests` и Windows smoke-проверки. Проверки GitHub Actions не заменяют визуального тестирования и тестов на реальных устройствах.
 3. Версии в `wpf/CacheTrim.Wpf.csproj` и `winui/Core/AppInfo.cs` должны совпадать. В выпуске нужны `CacheTrim.exe`, `DesktopPet.exe` и отдельные файлы SHA-256. Не перезаписывай ранее опубликованные EXE и контрольные суммы: ими пользуется обновлятор друзей.
 4. Сохраняй описание изменений и указывай ограничения. Если история GitHub недоступна, приложение показывает заметки текущего релиза с предупреждением. Старые релизы могут не иметь подробных заметок.
 5. После работы обновляй эту памятку, не записывай в неё токены, пароли или приватные данные.
