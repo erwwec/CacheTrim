@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf']
+    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety']
   pull_request:
     branches: [main]
 
@@ -33,3 +33,14 @@ jobs:
       - name: Check Desktop Acrylic backdrop
         shell: pwsh
         run: .\tests\SmokeGlass.ps1
+      - name: Test cleanup boundaries
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CleanerSafetyTests\CleanerSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleaner safety tests failed' }
+      - name: Build and smoke-test Desktop Pet
+        shell: pwsh
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
+          .\tests\SmokePet.ps1
