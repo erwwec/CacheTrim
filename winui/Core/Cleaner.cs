@@ -96,14 +96,6 @@ namespace CacheTrim
                 _log(string.Format("  {0}  {1}  ({2} файлов)", path, FormatBytes(_bytes - before), _files - filesBefore));
             }
 
-            // Other local profiles: only when elevated, and failures are silent.
-            foreach (string path in OtherProfileTemps())
-            {
-                long before = _bytes;
-                Sweep(path, age, "*");
-                if (_bytes > before)
-                    _log(string.Format("  {0}  {1}", path, FormatBytes(_bytes - before)));
-            }
         }
 
         private void CleanWer()
@@ -162,6 +154,7 @@ namespace CacheTrim
             DeleteFile(Path.Combine(windir, "MEMORY.DMP"));
             Sweep(Path.Combine(windir, "Minidump"), null, "*");
             Sweep(Path.Combine(windir, "LiveKernelReports"), null, "*");
+            Sweep(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CrashDumps"), null, "*");
             _log("  " + FormatBytes(_bytes - before));
         }
 
@@ -214,9 +207,7 @@ namespace CacheTrim
             _log("-- кэш Windows Update / Delivery Optimization");
             long before = _bytes;
             string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-
-            // Only the download queues are touched, never the component store.
+            // Only downloaded update files are touched, never the BITS job database or component store.
             bool restartWua;
             bool restartBits;
             bool wuaStopped = StopService("wuauserv", out restartWua);
@@ -227,7 +218,6 @@ namespace CacheTrim
                     _log("  службы обновления заняты, удалятся только незанятые файлы");
 
                 Sweep(Path.Combine(windir, @"SoftwareDistribution\Download"), null, "*");
-                Sweep(Path.Combine(programData, @"Microsoft\Network\Downloader"), null, "*");
                 Sweep(Path.Combine(windir, @"SoftwareDistribution\DeliveryOptimization"), null, "*");
             }
             finally
@@ -302,10 +292,16 @@ namespace CacheTrim
 
             try
             {
-                if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+                // Check every ancestor, not only the leaf: a junction higher in the
+                // path can otherwise redirect cleanup outside the intended location.
+                for (DirectoryInfo directory = new DirectoryInfo(Path.GetFullPath(root)); directory != null; directory = directory.Parent)
                 {
-                    _log("  пропущена ссылка на каталог: " + root);
-                    return;
+                    if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        _log("  пропущен путь через ссылку на каталог: " + directory.FullName);
+                        _skipped++;
+                        return;
+                    }
                 }
             }
             catch (Exception)
@@ -447,39 +443,6 @@ namespace CacheTrim
 
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             paths.Add(Path.Combine(local, "Temp"));
-            paths.Add(Path.Combine(local, "CrashDumps"));
-            paths.Add(Path.Combine(local, @"Microsoft\Windows\INetCache"));
-
-            return paths;
-        }
-
-        private static IEnumerable<string> OtherProfileTemps()
-        {
-            List<string> paths = new List<string>();
-            string root = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-            if (string.IsNullOrEmpty(root))
-                return paths;
-
-            string current = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string[] dirs;
-            try
-            {
-                dirs = Directory.GetDirectories(Path.Combine(root, "Users"));
-            }
-            catch (Exception)
-            {
-                return paths;
-            }
-
-            foreach (string dir in dirs)
-            {
-                if (string.Equals(dir, current, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                string temp = Path.Combine(dir, @"AppData\Local\Temp");
-                if (Directory.Exists(temp))
-                    paths.Add(temp);
-            }
 
             return paths;
         }
