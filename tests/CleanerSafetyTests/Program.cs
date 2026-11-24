@@ -37,6 +37,13 @@ internal static class Program {
             sweep.Invoke(cleaner, new object[] { regular, null, "*" });
             if (File.Exists(ordinary)) throw new Exception("ordinary temp file not cleaned");
             Console.WriteLine("OK: ordinary temp file cleaned");
+            string runningProcess = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+            var guard = new GameGuard(new[] { Path.Combine(baseDir, runningProcess + ".exe") });
+            try { guard.Check(true); throw new Exception("running protected process was ignored"); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(runningProcess, StringComparison.OrdinalIgnoreCase)) { Console.WriteLine("OK: running protected process blocks maintenance"); }
+            try { guard.Check(); throw new Exception("repeat check bypassed active game"); }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(runningProcess, StringComparison.OrdinalIgnoreCase)) { Console.WriteLine("OK: rapid retry does not bypass game guard"); }
+
             string excludedDir = Path.Combine(regular, "excluded");
             Directory.CreateDirectory(excludedDir);
             string excluded = Path.Combine(excludedDir, "keep.tmp");

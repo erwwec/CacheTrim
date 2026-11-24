@@ -17,6 +17,7 @@ namespace CacheTrim
         private int _files;
         private int _skipped;
         private readonly CleanupOptions _options;
+        private readonly GameGuard _gameGuard;
         private bool _preview;
         private string _category = "temp";
         private DateTime? _categoryCutoff;
@@ -28,6 +29,7 @@ namespace CacheTrim
             _log = log;
             _options = options ?? CleanupOptions.Load();
             _options.Validate();
+            _gameGuard = new GameGuard();
         }
 
         public void Preview(Config c) { _preview = true; try { Run(c); } finally { _preview = false; } }
@@ -62,6 +64,8 @@ namespace CacheTrim
 
         public void Run(Config c)
         {
+            if (!_preview) _gameGuard.Check(true);
+            using FileStream runLock = _preview ? null : AcquireRunLock();
             DateTime? tempAge = c.TempAgeHours > 0
                 ? (DateTime?)DateTime.UtcNow.AddHours(-c.TempAgeHours)
                 : null;
@@ -101,6 +105,7 @@ namespace CacheTrim
             if (c.UpdateCache)
             { Category("updates"); CleanWindowsUpdate(); }
 
+            if (!_preview) _gameGuard.Check(true);
             if (!_preview && (c.Dns || c.Arp || c.Netbios))
                 CleanNetwork(c);
 
@@ -115,6 +120,14 @@ namespace CacheTrim
 
             _log(string.Format(_preview ? "-- предпросмотр: {0}, файлов {1}, пропущено {2}" : "-- итого: {0}, файлов {1}, пропущено {2}",
                 FormatBytes(_bytes), _files, _skipped));
+        }
+
+        private static FileStream AcquireRunLock()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CacheTrim");
+            Directory.CreateDirectory(dir);
+            try { return new FileStream(Path.Combine(dir, "clean.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+            catch (IOException ex) { throw new InvalidOperationException("Очистка уже выполняется или файл блокировки недоступен.", ex); }
         }
 
         // ---------------- disk sections ----------------
@@ -325,6 +338,7 @@ namespace CacheTrim
 
         private void Sweep(string root, DateTime? olderThanUtc, string pattern)
         {
+            if (!_preview) _gameGuard.Check();
             if (!Directory.Exists(root) || _options.IsExcluded(root))
                 return;
             olderThanUtc = EffectiveCutoff(olderThanUtc);
@@ -354,6 +368,7 @@ namespace CacheTrim
 
             while (stack.Count > 0)
             {
+                if (!_preview) _gameGuard.Check();
                 string dir = stack.Pop();
                 dirs.Add(dir);
 
@@ -369,6 +384,7 @@ namespace CacheTrim
 
                 foreach (string file in files)
                 {
+                    if (!_preview) _gameGuard.Check();
                     try
                     {
                         FileInfo info = new FileInfo(file);
@@ -435,6 +451,7 @@ namespace CacheTrim
 
         private void DeleteFile(string path)
         {
+            if (!_preview) _gameGuard.Check();
             try
             {
                 FileInfo info = new FileInfo(path);
