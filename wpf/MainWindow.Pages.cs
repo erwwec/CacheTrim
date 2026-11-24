@@ -78,7 +78,7 @@ public partial class MainWindow
     {
         BeginPage("Питомец рабочего стола", "Запускай Клода прямо из CacheTrim — питомец остаётся поверх рабочего стола и окон.");
         WrapPanel cards = new();
-        cards.Children.Add(AdvancedModule("DESKTOP PET", "При первом запуске CacheTrim скачает питомца из GitHub и проверит файл по SHA-256. Затем Клод появится на рабочем столе отдельным прозрачным окном.",
+        cards.Children.Add(AdvancedModule("DESKTOP PET", "CacheTrim проверяет последнюю версию питомца в GitHub и скачивает её при необходимости. Для запуска из этой вкладки требуется интернет, даже если питомец уже скачан. Затем Клод появится на рабочем столе отдельным прозрачным окном.",
             AdvancedButton("Запустить питомца", async () => await LaunchDesktopPetAsync(), true)));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ ПИТОМЦЕМ", "Перетаскивай Клода левой кнопкой мыши. Нажми правой кнопкой по нему, чтобы открыть меню: там настраиваются размер, реплики, режим «Не отвлекать», коллекция и реакция на звук. Клик по спящему питомцу его разбудит.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync())));
@@ -192,7 +192,7 @@ public partial class MainWindow
         string title = enabled ? "Игровой профиль" : "Стандартные настройки";
         string details = enabled
             ? "CacheTrim изменит план питания, включит игровой режим Windows, отключит фоновую запись клипов и системное ограничение CPU для фоновых задач. Ноутбук может сильнее нагреваться и быстрее разряжаться. Часть изменений потребует перезапуска Windows."
-            : "CacheTrim восстановит прежний план питания, включит обратно параметры игровых записей и снимет изменения игрового профиля CacheTrim.";
+            : "CacheTrim применит стандартные значения параметров игрового профиля. Они могут отличаться от твоих прежних настроек. План питания восстанавливается из копии; если её нет, будет выбран «Сбалансированный».";
         if (!ConfirmRisk(title, details)) return;
         await RunBusyAsync(enabled ? "включается игровой профиль…" : "возвращаются стандартные параметры…", async () =>
         {
@@ -211,7 +211,7 @@ public partial class MainWindow
                 }
             });
             if (errors.Count > 0) MessageBox.Show(this, string.Join("\n", errors), "Часть параметров не изменилась", MessageBoxButton.OK, MessageBoxImage.Warning);
-            else MessageBox.Show(this, enabled ? "Игровой профиль применён. Если некоторые параметры не вступили в силу сразу, перезагрузите компьютер." : "Стандартные настройки восстановлены.", title, MessageBoxButton.OK, MessageBoxImage.Information);
+            else MessageBox.Show(this, enabled ? "Игровой профиль применён. Если некоторые параметры не вступили в силу сразу, перезагрузите компьютер." : "Стандартные значения применены. Они могут отличаться от твоих прежних настроек.", title, MessageBoxButton.OK, MessageBoxImage.Information);
         });
     }
 
@@ -376,8 +376,8 @@ public partial class MainWindow
         {
             string? error = await Task.Run(() => tweak.Set(highPerformance));
             if (error != null) throw new InvalidOperationException(error);
-            SetStatus(highPerformance ? "план питания: высокая производительность" : "прежний план питания восстановлен");
-            App.Log(highPerformance ? "план питания переключён: высокая производительность" : "прежний план питания восстановлен");
+            SetStatus(highPerformance ? "план питания: высокая производительность" : "план питания переключён (при отсутствии копии — сбалансированный)");
+            App.Log(highPerformance ? "план питания переключён: высокая производительность" : "план питания переключён: резервная копия или сбалансированный");
         });
     }
 
