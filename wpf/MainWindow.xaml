@@ -84,7 +84,10 @@
                         <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,0">
                             <TextBlock x:Name="AdminText" Text="АДМИНИСТРАТОР" FontSize="10" FontWeight="SemiBold" />
                         </StackPanel>
-                        <StackPanel x:Name="NavigationItems" />
+                        <StackPanel>
+                            <Button Content="Поиск функций · Ctrl+F" Margin="3,0,3,10" Padding="8,6" Click="OpenSearch_Click" />
+                            <StackPanel x:Name="NavigationItems" />
+                        </StackPanel>
                     </DockPanel>
                 </Border>
                 <Grid Grid.Column="1">

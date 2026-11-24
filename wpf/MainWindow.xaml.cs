@@ -71,6 +71,7 @@ public partial class MainWindow : Window
     public MainWindow(int startPage = 0)
     {
         InitializeComponent();
+        InputBindings.Add(new KeyBinding(new SearchCommand(this), new KeyGesture(Key.F, ModifierKeys.Control)));
         BrandVersion.Text = "SYSTEM TOOLS · " + AppInfo.Version;
         PageScroll.SizeChanged += OnPageViewportSizeChanged;
         _settings = App.Settings;
