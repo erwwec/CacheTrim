@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           $petHash = (Get-FileHash .\dist\pet-publish\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          $assembly = '.\wpf\obj\Release\net10.0-windows10.0.19041.0\win-x64\CacheTrim.dll'
+          $assembly = '.\wpf\obj\x64\Release\net10.0-windows10.0.19041.0\win-x64\CacheTrim.dll'
           dotnet run --project .\tests\BuildPinTests\BuildPinTests.csproj -c Release -- $assembly $petHash
           if ($LASTEXITCODE -ne 0) { throw 'App does not pin this build of Desktop Pet' }
       - name: Check update-notes detection on Windows
