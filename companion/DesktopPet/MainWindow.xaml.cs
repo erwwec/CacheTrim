@@ -29,6 +29,12 @@ public partial class MainWindow : Window
     private static readonly ImageSource SleepSprite = LoadSprite("claude_sleep.png");
 
     private readonly DispatcherTimer _motionTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
+    private readonly DispatcherTimer _lyricsTimer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
+    private LyricsService? _lyricsService;
+    private CancellationTokenSource _lyricsCancellation = new();
+    private bool _lyricsEnabled;
+    private bool _lyricsBusy;
+    private string _lyricsLastLine = "";
     private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _platformScanTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private readonly Random _random = new();
@@ -98,6 +104,7 @@ public partial class MainWindow : Window
         CollectionButton.Content = _collectionEnabled ? "Коллекция: вкл" : "Коллекция: выкл";
         RoutineButton.Content = _routineEnabled ? "Распорядок: вкл" : "Распорядок: выкл";
         AudioButton.Content = _audioEnabled ? "Реакция на звук: вкл" : "Реакция на звук: выкл";
+        LyricsButton.Content = _lyricsEnabled ? "Текст песни: вкл" : "Текст песни: выкл";
         PhraseTextBox.Text = string.Join(Environment.NewLine, _customPhrases);
         Left = SystemParameters.WorkArea.Right - ModelRight * _uiScale - 28;
         Top = SystemParameters.WorkArea.Bottom - ModelBottom * _uiScale;
@@ -106,6 +113,8 @@ public partial class MainWindow : Window
         ScheduleNextLeap(DateTime.UtcNow);
         _motionTimer.Tick += Motion_Tick;
         _audioTimer.Tick += Audio_Tick;
+        _lyricsTimer.Tick += Lyrics_Tick;
+        if (_lyricsEnabled) _lyricsTimer.Start();
         _platformScanTimer.Tick += (_, _) => RefreshPlatforms();
         _motionTimer.Start();
         _audioTimer.Start();
@@ -709,6 +718,52 @@ public partial class MainWindow : Window
         SaveSettings();
     }
 
+    private void Lyrics_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_lyricsEnabled)
+        {
+            var result = MessageBox.Show(this, "Чтобы найти синхронизированный текст, название песни, исполнитель, альбом и длительность (если доступны) будут отправлены сервису LRCLIB через интернет. Аудиозапись не отправляется. Работает только с совместимыми медиаплеерами и не для всех песен. Включить?", "Текст песни", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (result != MessageBoxResult.Yes) return;
+            _lyricsEnabled = true;
+            _lyricsTimer.Start();
+        }
+        else
+        {
+            _lyricsEnabled = false;
+            _lyricsTimer.Stop();
+            _lyricsCancellation.Cancel();
+            _lyricsCancellation.Dispose();
+            _lyricsCancellation = new CancellationTokenSource();
+            _lyricsLastLine = "";
+            if (SpeechText.Text.Length > 0) SpeechBubble.Visibility = Visibility.Collapsed;
+        }
+        LyricsButton.Content = _lyricsEnabled ? "Текст песни: вкл" : "Текст песни: выкл";
+        SaveSettings();
+    }
+
+    private async void Lyrics_Tick(object? sender, EventArgs e)
+    {
+        if (!_lyricsEnabled || _quietMode || _lyricsBusy || _isClosing) return;
+        _lyricsBusy = true;
+        var token = _lyricsCancellation.Token;
+        try
+        {
+            _lyricsService ??= new LyricsService();
+            string? line = await _lyricsService.CurrentLineAsync(token);
+            if (token.IsCancellationRequested || !_lyricsEnabled || _quietMode || _isClosing) return;
+            if (string.IsNullOrWhiteSpace(line)) { _lyricsLastLine = ""; return; }
+            if (line.Length > 180) line = line[..180] + "…";
+            if (line != _lyricsLastLine || SpeechBubble.Visibility != Visibility.Visible || SpeechText.Text != line)
+            {
+                _lyricsLastLine = line;
+                ShowSpeech(line);
+            }
+            _speechEndsAt = DateTime.UtcNow.AddSeconds(3);
+        }
+        catch (Exception) { /* Optional feature must never crash the pet on network or media errors. */ }
+        finally { _lyricsBusy = false; }
+    }
+
     private void ChatterSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_initializing) return;
@@ -796,6 +851,7 @@ public partial class MainWindow : Window
             _audioEnabled = values.Length <= 6 || !bool.TryParse(values[6], out var audio) || audio;
             _collectionEnabled = values.Length <= 7 || !bool.TryParse(values[7], out var collection) || collection;
             _routineEnabled = values.Length <= 8 || !bool.TryParse(values[8], out var routine) || routine;
+            _lyricsEnabled = values.Length > 11 && bool.TryParse(values[11], out var lyrics) && lyrics;
             if (values.Length > 9)
                 _collectionItems.AddRange(values[9].Split(',', StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => int.TryParse(s, out var item) ? item : -1).Where(item => item is >= 0 and < 4).Take(8));
@@ -826,7 +882,7 @@ public partial class MainWindow : Window
                 _chatterLevel.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _jumpRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _quietMode.ToString(), _surprisesEnabled.ToString(), _favoriteSpotEnabled.ToString(), _audioEnabled.ToString(),
-                _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases
+                _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases, _lyricsEnabled.ToString()
             };
             File.WriteAllLines(tempPath, values);
             File.Move(tempPath, _settingsPath, true);
@@ -857,7 +913,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isClosing = true;
-        _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop();
+        _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
+        _lyricsCancellation.Cancel(); _lyricsCancellation.Dispose(); _lyricsService?.Dispose();
         StopAudioCapture();
         base.OnClosed(e);
     }

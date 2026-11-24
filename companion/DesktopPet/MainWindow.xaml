@@ -55,6 +55,7 @@
                     <Button Content="Сохранить фразы" Click="SavePhrases_Click" Margin="0,3" Padding="6,3" />
                     <Button Content="Прыгнуть" Click="Jump_Click" Margin="0,2" Padding="6,3" />
                     <Button x:Name="AudioButton" Content="Реакция на звук: вкл" Click="Audio_Click" Margin="0,2" Padding="6,3" />
+                    <Button x:Name="LyricsButton" Content="Текст песни: выкл" Click="Lyrics_Click" Margin="0,2" Padding="6,3" />
                     <Button Content="Выход" Click="Exit_Click" Margin="0,2" Padding="6,3" />
                 </StackPanel>
               </Border>
