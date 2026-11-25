@@ -137,7 +137,7 @@
                             <Button x:Name="AssistantCloudVoiceButton" Content="Сказать задачу ИИ" Click="CloudVoice_Click" />
                             <Button x:Name="AssistantCloudButton" Content="Спросить ИИ" Click="AskCloud_Click" />
                             <TextBlock x:Name="AssistantCloudStatus" Text="ИИ не запущен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,4" />
-                            <TextBlock Text="Пока ИИ может открыть YouTube и загрузки, назвать время, прыгнуть или принести секрет. Он не видит экран и не выбирает видео." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <TextBlock Text="ИИ может открыть YouTube, Telegram Desktop и загрузки, создать текстовую презентацию, назвать время, прыгнуть или принести секрет. Он пока не видит экран и не выбирает видео." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                         </StackPanel>
                     </Expander>
                     <Expander x:Name="BehaviorSection" Header="Поведение и секреты">

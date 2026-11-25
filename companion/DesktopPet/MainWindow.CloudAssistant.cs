@@ -103,7 +103,7 @@ public partial class MainWindow
                 }
             }
             AssistantCloudStatus.Text = "Запрос отправлен в Groq…";
-            var answer = await CloudAssistant.AskAsync(CloudHttp, key, question!, async (name, ct) =>
+            var answer = await CloudAssistant.AskAsync(CloudHttp, key, question!, async (name, arguments, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
                 if (!_experimentalModel || _isClosing || !ReferenceEquals(_cloudCancellation, cts)) return "Действие отменено.";
@@ -114,6 +114,28 @@ public partial class MainWindow
                     case "open_youtube":
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.youtube.com/") { UseShellExecute = true });
                         return "Открыта главная страница YouTube. Видео не выбиралось.";
+                    case "open_telegram":
+                        string[] candidates = {
+                            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Telegram Desktop", "Telegram.exe"),
+                            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Telegram Desktop", "Telegram.exe"),
+                            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Telegram Desktop", "Telegram.exe")
+                        };
+                        string? telegram = Array.Find(candidates, File.Exists);
+                        if (telegram == null) return "Telegram Desktop не найден в стандартных папках. Приложение не запущено.";
+                        var launch = new System.Diagnostics.ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+                        launch.ArgumentList.Add(telegram);
+                        if (System.Diagnostics.Process.Start(launch) == null) return "Не удалось передать Telegram на запуск.";
+                        return "Windows получила запрос запустить Telegram Desktop; запуск не подтверждён.";
+                    case "create_presentation":
+                        string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        if (string.IsNullOrWhiteSpace(documents) || !Path.IsPathFullyQualified(documents)) return "Не удалось найти папку Документы. Презентация не создана.";
+                        using (var parsed = System.Text.Json.JsonDocument.Parse(arguments))
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            var folder = Path.Combine(documents, "CacheTrim", "Презентации");
+                            var file = PresentationBuilder.Create(parsed.RootElement, folder);
+                            return "Создана редактируемая текстовая презентация в Документы/CacheTrim/Презентации: " + Path.GetFileName(file) + ". Проверь факты: текст подготовлен ИИ.";
+                        }
                     case "get_time": return "Местная дата и время: " + DateTime.Now.ToString("dd.MM.yyyy HH:mm");
                     case "pet_jump": ExecuteAssistantCommand(PetVoiceCommand.Jump); return "Клод прыгнул.";
                     case "pet_secret": ExecuteAssistantCommand(PetVoiceCommand.Secret); return "Клод принёс секрет.";
