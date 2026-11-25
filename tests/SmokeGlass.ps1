@@ -26,7 +26,10 @@ public static class GlassSmoke {
 '@
 $settings = Join-Path $env:APPDATA 'CacheTrim'
 New-Item -ItemType Directory -Path $settings -Force | Out-Null
-Set-Content -LiteralPath (Join-Path $settings 'config.ini') -Value @('theme=LiquidGlass', 'glass_background_blur=100', 'glass_density=24') -Encoding utf8
+# Use a complete, valid cleanup configuration: partial files are now rejected for safety.
+$cleanupFlags = @('working_sets', 'standby', 'low_standby', 'modified', 'file_cache', 'temp', 'browsers', 'wer', 'update_cache', 'd3d_cache', 'thumbnails', 'dumps', 'windows_logs', 'uwp_cache', 'recycle', 'prefetch', 'dns', 'arp', 'netbios')
+$config = @($cleanupFlags | ForEach-Object { "$_=0" }) + @('temp_age_hours=24', 'theme=LiquidGlass', 'glass_background_blur=100', 'glass_density=24')
+Set-Content -LiteralPath (Join-Path $settings 'config.ini') -Value $config -Encoding utf8
 New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Force | Out-Null
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name EnableTransparency -Value 1 -Type DWord
 $exe = (Resolve-Path '.\dist\verify\CacheTrim.exe').Path
