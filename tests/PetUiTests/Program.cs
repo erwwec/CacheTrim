@@ -21,6 +21,15 @@ internal static class Program
             void Show(string text, bool lyrics) => speech.Invoke(pet, new object[] { text, lyrics });
             void Hide() => hide.Invoke(pet, null);
             void Check(bool ok, string label) { if (!ok) throw new Exception(label); Console.WriteLine("OK: " + label); }
+            var sections = new[] { "AppearanceSection", "RemindersSection", "CommandsSection", "BehaviorSection", "MusicSection" };
+            Check(sections.All(name => Element(name) is System.Windows.Controls.Expander), "all pet menu groups exist");
+            var music = (System.Windows.Controls.Expander)Element("MusicSection");
+            music.ApplyTemplate();
+            var content = (System.Windows.Controls.ContentPresenter)music.Template.FindName("SectionContent", music);
+            Check(content != null && content.Visibility == Visibility.Collapsed, "music settings initially collapsed");
+            music.IsExpanded = true; music.ApplyTemplate();
+            Check(content.Visibility == Visibility.Visible, "music settings can be expanded");
+            music.IsExpanded = false;
             Check(Element("BringSecretButton") != null && Element("LyricsStatusButton") != null, "secret and lyrics diagnostic buttons exist");
             type.GetMethod("BringSecret_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, new object[] { pet, new RoutedEventArgs() });
             var speechText = (System.Windows.Controls.TextBlock)Element("SpeechText");

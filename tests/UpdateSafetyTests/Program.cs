@@ -3,10 +3,30 @@ namespace CacheTrim { internal static class AppInfo { public const string Versio
 internal static class Program
 {
     static void Check(bool ok, string text) { if (!ok) throw new Exception(text); Console.WriteLine("OK: " + text); }
+    sealed class Capture : IProgress<UpdateDownloadProgress> { public readonly List<UpdateDownloadProgress> Items = new(); public void Report(UpdateDownloadProgress value) => Items.Add(value); }
     static void Main()
     {
         string dir=Path.Combine(Path.GetTempPath(),"CacheTrimUpdateTest-"+Guid.NewGuid()); Directory.CreateDirectory(dir);
         try {
+            Check(HotkeyPolicy.Valid(1, 2, 3) && HotkeyPolicy.Valid(0, 0, 0), "three distinct shortcuts and disabled choices accepted");
+            Check(!HotkeyPolicy.Valid(1, 1, 0) && !HotkeyPolicy.Valid(0, 2, 2) && !HotkeyPolicy.Valid(3, 0, 3), "duplicate shortcuts rejected");
+            Check(!HotkeyPolicy.Valid(7, 0, 0) && !HotkeyPolicy.Valid(0, -1, 0), "shortcut range enforced");
+            byte[] download = new byte[4096]; new Random(42).NextBytes(download);
+            var events = new Capture();
+            using (var source = new MemoryStream(download)) using (var target = new MemoryStream()) {
+                string actual = UpdateService.CopyUpdateStream(source, target, download.Length, 5000, events);
+                Check(target.ToArray().SequenceEqual(download), "downloaded bytes retained");
+                Check(actual == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(download)).ToLowerInvariant(), "stream hash remains correct");
+                Check(events.Items.First().DownloadedBytes == 0 && events.Items.Last().DownloadedBytes == download.Length && events.Items.Last().TotalBytes == download.Length, "known size reports correct byte progress");
+            }
+            events.Items.Clear();
+            using (var source = new MemoryStream(download)) using (var target = new MemoryStream()) UpdateService.CopyUpdateStream(source, target, null, 5000, events);
+            Check(events.Items.All(e => e.TotalBytes == null) && events.Items.Last().DownloadedBytes == download.Length, "unknown total remains indeterminate");
+            events.Items.Clear();
+            using (var source = new MemoryStream(download)) using (var target = new MemoryStream()) UpdateService.CopyUpdateStream(source, target, 10, 5000, events);
+            Check(events.Items.Last().TotalBytes == null, "incorrect announced length does not report false percent");
+            try { using var source = new MemoryStream(download); using var target = new MemoryStream(); UpdateService.CopyUpdateStream(source, target, null, 100, events); throw new Exception("oversized update accepted"); }
+            catch (InvalidDataException) { Check(true, "oversized stream rejected"); }
             string path=Path.Combine(dir,"file"); File.WriteAllBytes(path,new byte[]{0,1,2});
             Check(!UpdateService.HasWindowsExecutableHeader(path),"invalid header rejected");
             File.Delete(path); Check(!File.Exists(path),"rejected file can be deleted after checking");
