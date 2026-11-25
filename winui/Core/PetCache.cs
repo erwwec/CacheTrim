@@ -10,6 +10,7 @@ internal static class PetCache
     // Hashes of previously published DesktopPet.exe releases. Older pets require explicit consent.
     internal static readonly (string Version, string Hash)[] PreviousVersions =
     [
+        ("2.1.17", "68bd1de9760e55c1cd09f8bfc95569c473ff408725d0f454dde101b8f5218410"),
         ("2.1.16", "878bb93fde2f5452e5c77f17a8daf35f9dc205992676df5472fb56d95b70fe45"),
         ("2.1.15", "76de5744780dd950e428a514d3b6c36fc30d407dcd57c815ef1df082738c2dab")
     ];

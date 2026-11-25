@@ -24,6 +24,24 @@ internal static class AnimeAvatarPackage
         return target;
     }
 
+    // Hold a verified read handle across Process.Start, so another process cannot
+    // replace the checked file on Windows between the hash check and execution.
+    internal static FileStream TryOpenVerified(string path, string expectedHash = Expected, long expectedLength = ExpectedLength)
+    {
+        FileStream stream = null;
+        try
+        {
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length != expectedLength || stream.ReadByte() != 'M' || stream.ReadByte() != 'Z') { stream.Dispose(); return null; }
+            stream.Position = 0;
+            if (!string.Equals(Convert.ToHexString(SHA256.HashData(stream)), expectedHash, StringComparison.OrdinalIgnoreCase)) { stream.Dispose(); return null; }
+            stream.Position = 0;
+            return stream;
+        }
+        catch (IOException) { stream?.Dispose(); return null; }
+        catch (UnauthorizedAccessException) { stream?.Dispose(); return null; }
+    }
+
     internal static bool FileMatches(string path, string expectedHash, long expectedLength)
     {
         using FileStream file = File.OpenRead(path);

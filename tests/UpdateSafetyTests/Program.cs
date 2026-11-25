@@ -44,6 +44,18 @@ internal static class Program
             byte[] executable = new byte[4096]; executable[0] = (byte)'M'; executable[1] = (byte)'Z';
             File.WriteAllBytes(path, executable);
             string petHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(executable));
+            using (var verifiedAvatar = AnimeAvatarPackage.TryOpenVerified(path, petHash, executable.Length))
+            {
+                Check(verifiedAvatar != null, "matching avatar verified under a held handle");
+                if (OperatingSystem.IsWindows())
+                {
+                    bool blocked = false;
+                    try { using var write = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite); }
+                    catch (IOException) { blocked = true; }
+                    Check(blocked, "verified avatar cannot be modified before launch");
+                }
+            }
+            Check(AnimeAvatarPackage.TryOpenVerified(path, new string('0', 64), executable.Length) == null, "tampered avatar is not opened for launch");
             using (var locked = PetCache.TryOpenVerified(path, petHash)) Check(locked != null, "matching cached pet verified");
             Check(PetCache.TryOpenVerified(path, new string('0', 64)) == null, "tampered cached pet rejected");
             Check(PetCache.TryOpenVerified(path, "bad") == null, "invalid trust hash rejected");

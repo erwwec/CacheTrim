@@ -31,10 +31,16 @@ internal static class Program
             Check(content.Visibility == Visibility.Visible, "music settings can be expanded");
             music.IsExpanded = false;
             Check(Element("BringSecretButton") != null && Element("LyricsStatusButton") != null, "secret and lyrics diagnostic buttons exist");
+            type.GetField("_reminderHoldUntil", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, DateTime.UtcNow.AddMinutes(1));
             type.GetMethod("BringSecret_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, new object[] { pet, new RoutedEventArgs() });
             var speechText = (System.Windows.Controls.TextBlock)Element("SpeechText");
-            Check(speechText.Text.StartsWith("Принёс секрет:") && Element("SpeechBubble").Visibility == Visibility.Visible, "manual secret appears in thought bubble");
+            Check(speechText.Text.StartsWith("Принёс секрет:") && Element("SpeechBubble").Visibility == Visibility.Visible, "manual secret appears even during a reminder");
             Check((DateTime)type.GetField("_lyricsHoldUntil", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)! > DateTime.UtcNow, "lyrics wait while secret is shown");
+            type.GetMethod("StopAudioCapture", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
+            type.GetField("_audioEnabled", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, true);
+            type.GetField("_audioAvailable", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, false);
+            type.GetMethod("Audio_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, new object[] { pet, new RoutedEventArgs() });
+            Check(!(bool)type.GetField("_audioEnabled", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)!, "unavailable audio reaction can still be switched off");
             var parse = type.GetMethod("ParseSetting", BindingFlags.Static | BindingFlags.NonPublic)!;
             double Parse(string value) => (double)parse.Invoke(null, new object[] { new[] { value }, 0, 0.6, 0.5, 2.0 })!;
             Check(Parse("NaN") == 0.6 && Parse("Infinity") == 0.6, "invalid floating point settings use safe defaults");
