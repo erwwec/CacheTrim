@@ -157,6 +157,7 @@ var lastGoal = JsonDocument.Parse(mock.Bodies[^1]).RootElement.GetProperty("mess
 Check(lastGoal.Contains("пятое видео") && lastGoal.Contains("approved test action open_telegram"), "multi-action goal and prior steps sent for next decision");
 
 
+Check(ComputerSafety.AdministratorWarning(true).Contains("АДМИНИСТРАТОРА") && ComputerSafety.AdministratorWarning(true).Contains("системные") && ComputerSafety.AdministratorWarning(false) == "", "elevated computer control requires an explicit risk warning");
 Check(!ComputerSafety.NeedsReview(new ComputerStep("open_youtube", "open the homepage")), "normal action can proceed automatically");
 Check(!ComputerSafety.NeedsReview(new ComputerStep("set_volume", "set volume", Level: 20)), "ordinary volume action can proceed automatically");
 Check(ComputerSafety.NeedsReview(new ComputerStep("key", "key press", Key: "DELETE")), "delete key requires review");
