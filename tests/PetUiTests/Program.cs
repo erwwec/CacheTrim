@@ -26,6 +26,7 @@ internal static class Program
             selector.SelectedIndex = 0;
             Check(Element("AssistantSection").Visibility == Visibility.Collapsed, "assistant hidden in original model");
             Check(type.GetField("_voiceSession", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "microphone not started automatically");
+            Check(type.GetField("_cloudCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "cloud assistant not started automatically");
             var classic = sprite.Source;
             selector.SelectedIndex = 1;
             Check(Element("AssistantSection").Visibility == Visibility.Visible, "assistant visible in V2");
@@ -34,7 +35,12 @@ internal static class Program
             type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, false);
             type.GetMethod("LoadSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
             Check((bool)type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)!, "test model selection is restored");
+            var cloudCancellation = new System.Threading.CancellationTokenSource();
+            type.GetField("_cloudCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, cloudCancellation);
+            type.GetMethod("UpdateAssistantBadge", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
+            Check(Element("AssistantBadge").Visibility == Visibility.Visible, "assistant activity is visible on the pet");
             selector.SelectedIndex = 0;
+            Check(Element("AssistantBadge").Visibility == Visibility.Collapsed && type.GetField("_cloudCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "switch to classic cancels cloud and hides activity");
             Check(Element("AssistantSection").Visibility == Visibility.Collapsed && type.GetField("_voiceSession", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "switching to original stops voice and hides assistant");
             Check(ReferenceEquals(sprite.Source, classic), "original model can be restored without replacement");
             var sections = new[] { "AppearanceSection", "RemindersSection", "CommandsSection", "BehaviorSection", "MusicSection" };
