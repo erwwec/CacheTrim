@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private static readonly ImageSource WorkSprite = LoadSprite("claude_work.png");
     private static readonly ImageSource PhoneSprite = LoadSprite("claude_phone.png");
     private static readonly ImageSource SleepSprite = LoadSprite("claude_sleep.png");
+    private static readonly ImageSource ExperimentalSprite = LoadExperimentalSprite();
 
     private readonly DispatcherTimer _reminderTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private double _petOpacity = 1;
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
     private bool _audioAvailable;
     private bool _isClosing;
     private bool _initializing = true;
+    private bool _experimentalModel;
     private double _pendingAudioLevel;
     private double _audioLevel;
     private double _velocityX;
@@ -99,7 +101,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         LoadSettings();
+        // Explicit launch choices override the saved appearance; ordinary autostart/hotkey keeps it.
+        bool modelOverridden = false;
+        foreach (string arg in Environment.GetCommandLineArgs())
+        {
+            if (arg.Equals("--model=classic", StringComparison.OrdinalIgnoreCase)) { _experimentalModel = false; modelOverridden = true; }
+            if (arg.Equals("--model=experimental", StringComparison.OrdinalIgnoreCase)) { _experimentalModel = true; modelOverridden = true; }
+        }
         InitializeComponent();
+        ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
         PetCanvas.LayoutTransform = new ScaleTransform(_uiScale, _uiScale);
         Width = 260 * _uiScale;
         Height = 320 * _uiScale;
@@ -134,6 +144,7 @@ public partial class MainWindow : Window
             Top = Math.Clamp(_savedTop, area.Top - ModelTop * _uiScale, Math.Max(area.Top - ModelTop * _uiScale, area.Bottom - ModelBottom * _uiScale));
         }
         _initializing = false;
+        if (modelOverridden) SaveSettings();
         _nextIdlePollAt = DateTime.UtcNow;
         ScheduleNextLeap(DateTime.UtcNow);
         _motionTimer.Tick += Motion_Tick;
@@ -384,6 +395,49 @@ public partial class MainWindow : Window
         return image;
     }
 
+    private static ImageSource LoadExperimentalSprite()
+    {
+        using var resource = typeof(MainWindow).Assembly.GetManifestResourceStream("DesktopPet.ExperimentalSprite")
+            ?? throw new InvalidOperationException("В сборке отсутствует тестовая модель Клода.");
+        using var reader = new StreamReader(resource);
+        byte[] png = Convert.FromBase64String(reader.ReadToEnd());
+        using var stream = new MemoryStream(png);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.StreamSource = stream;
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    private ImageSource SpriteFor(Activity activity, bool miniScene = false)
+    {
+        // The prototype currently has one pose; animation and behavior still run.
+        if (_experimentalModel) return ExperimentalSprite;
+        if (miniScene) return activity switch
+        {
+            Activity.DeskNap => SleepSprite,
+            Activity.Stretching => WorkSprite,
+            _ => PhoneSprite
+        };
+        return activity switch
+        {
+            Activity.Working or Activity.DeskNap or Activity.Stretching => WorkSprite,
+            Activity.Phone or Activity.Tea or Activity.Reading => PhoneSprite,
+            Activity.Sleeping => SleepSprite,
+            _ => IdleSprite
+        };
+    }
+
+    private void ModelSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing || ModelSelector.SelectedIndex < 0) return;
+        _experimentalModel = ModelSelector.SelectedIndex == 1;
+        PetSprite.Source = SpriteFor(_activity, _miniSceneActive);
+        SaveSettings();
+    }
+
     private void RefreshPlatforms()
     {
         var rects = new List<Rect>();
@@ -488,13 +542,7 @@ public partial class MainWindow : Window
             _nextWorkPhaseAt = DateTime.UtcNow.AddSeconds(_random.Next(2, 5));
         }
         if (changed && activity != Activity.Sleeping) ScheduleNextLeap(DateTime.UtcNow);
-        PetSprite.Source = activity switch
-        {
-            Activity.Working or Activity.DeskNap or Activity.Stretching => WorkSprite,
-            Activity.Phone or Activity.Tea or Activity.Reading => PhoneSprite,
-            Activity.Sleeping => SleepSprite,
-            _ => IdleSprite
-        };
+        PetSprite.Source = SpriteFor(activity);
         PropGlyph.Visibility = activity is Activity.Tea or Activity.Reading ? Visibility.Visible : Visibility.Collapsed;
         PropGlyph.Text = activity == Activity.Tea ? "☕" : "📖";
 
@@ -519,12 +567,7 @@ public partial class MainWindow : Window
         _activityTransition = true;
         _activityTransitionEndsAt = DateTime.UtcNow.AddSeconds(scene == Activity.DeskNap ? 5 : 4);
         _activity = scene;
-        PetSprite.Source = scene switch
-        {
-            Activity.DeskNap => SleepSprite,
-            Activity.Stretching => WorkSprite,
-            _ => PhoneSprite
-        };
+        PetSprite.Source = SpriteFor(scene, miniScene: true);
         PropGlyph.Text = scene == Activity.Tea ? "☕" : scene == Activity.Reading ? "📖" : "";
         PropGlyph.Visibility = scene is Activity.Tea or Activity.Reading ? Visibility.Visible : Visibility.Collapsed;
         var sceneLine = scene switch { Activity.Tea => "Перерыв на чай.", Activity.Reading => "Почитаю чуть-чуть.", Activity.Stretching => "Разминаюсь!", _ => "Пять минут отдыха…" };
@@ -932,6 +975,7 @@ public partial class MainWindow : Window
             }
             _savedLeft = ParseSetting(values, 15, double.NaN, -100000, 100000);
             _savedTop = ParseSetting(values, 16, double.NaN, -100000, 100000);
+            _experimentalModel = values.Length > 17 && bool.TryParse(values[17], out var experimental) && experimental;
             _lyricsEnabled = values.Length > 11 && bool.TryParse(values[11], out var lyrics) && lyrics;
             if (values.Length > 9)
                 _collectionItems.AddRange(values[9].Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -966,7 +1010,8 @@ public partial class MainWindow : Window
                 _collectionEnabled.ToString(), _routineEnabled.ToString(), string.Join(',', _collectionItems), savedPhrases, _lyricsEnabled.ToString(),
                 _petOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture), _reminderMinutes.ToString(),
                 Convert.ToBase64String(Encoding.UTF8.GetBytes(_reminderText)),
-                _savedLeft.ToString(System.Globalization.CultureInfo.InvariantCulture), _savedTop.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                _savedLeft.ToString(System.Globalization.CultureInfo.InvariantCulture), _savedTop.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                _experimentalModel.ToString()
             };
             File.WriteAllLines(tempPath, values);
             File.Move(tempPath, _settingsPath, true);
