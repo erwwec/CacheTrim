@@ -147,7 +147,7 @@ public partial class MainWindow : Window
         _platformScanTimer.Start();
         if (_audioEnabled && !StartAudioCapture())
         {
-            AudioButton.Content = "Звук недоступен — нажми";
+            AudioButton.Content = "Звук недоступен — выключить";
         }
         SetActivity(Activity.Roaming, false);
     }
@@ -364,10 +364,11 @@ public partial class MainWindow : Window
             }
             _audioAvailable = false;
             _audioLevel = 0;
+            Interlocked.Exchange(ref _pendingAudioLevel, 0);
             _musicDetected = false;
             _audioAboveCount = 0;
             _audioBelowCount = 0;
-            AudioButton.Content = "Звук недоступен — нажми";
+            AudioButton.Content = "Звук недоступен — выключить";
         });
     }
 
@@ -736,7 +737,7 @@ public partial class MainWindow : Window
 
     private void Audio_Click(object sender, RoutedEventArgs e)
     {
-        if (_audioEnabled && _audioAvailable)
+        if (_audioEnabled)
         {
             _audioEnabled = false;
             StopAudioCapture();
@@ -751,7 +752,7 @@ public partial class MainWindow : Window
             Interlocked.Exchange(ref _pendingAudioLevel, 0);
             if (!StartAudioCapture())
             {
-                AudioButton.Content = "Звук недоступен — нажми";
+                AudioButton.Content = "Звук недоступен — выключить";
                 return;
             }
             _audioEnabled = true;
@@ -850,6 +851,8 @@ public partial class MainWindow : Window
         while (_collectionItems.Count > 8) _collectionItems.RemoveAt(0);
         SaveSettings();
         _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(6);
+        // An explicit user request must not be silently suppressed by a reminder.
+        _reminderHoldUntil = DateTime.MinValue;
         Jump_Click(sender, e);
         string surprise = item switch { 0 => "звёздочка ⭐", 1 => "камешек 💎", 2 => "клевер 🍀", _ => "подарок 🎁" };
         ShowSpeech("Принёс секрет: " + surprise);
