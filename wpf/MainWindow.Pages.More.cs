@@ -179,7 +179,7 @@ public partial class MainWindow
             }
             appearance.Children.Add(new TextBlock
             {
-                Text = "Desktop Acrylic доступен в Windows 11 22H2 и новее при включённой прозрачности. На других системах используется сплошной фон. Силу размытия задаёт Windows.",
+                Text = "Desktop Acrylic доступен в Windows 11 22H2 и новее при включённой прозрачности. Windows может заменить его сплошным цветом при энергосбережении, высокой контрастности или когда окно неактивно. Силу размытия задаёт Windows.",
                 FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 10), Foreground = Brush(Theme.Muted)
             });
             CheckBox backgroundBlur = new()
@@ -297,6 +297,33 @@ public partial class MainWindow
         ShowSettings();
     }
 
+    private bool _showingUpdateDownload;
+    private void ShowUpdateDownloadProgress(UpdateDownloadProgress progress)
+    {
+        if (!_busy || !_showingUpdateDownload) return;
+        BusyProgressDetail.Visibility = Visibility.Visible;
+        if (progress.Verifying)
+        {
+            BusyProgressBar.IsIndeterminate = true;
+            SetStatus("Загрузка завершена. Проверяем обновление…");
+            BusyProgressDetail.Text = "Не закрывай CacheTrim до завершения проверки.";
+            return;
+        }
+        double downloaded = progress.DownloadedBytes / 1048576.0;
+        if (progress.TotalBytes is long total && total > 0 && progress.DownloadedBytes <= total)
+        {
+            double percent = 100.0 * progress.DownloadedBytes / total;
+            BusyProgressBar.IsIndeterminate = false;
+            BusyProgressBar.Value = Math.Clamp(percent, 0, 100);
+            BusyProgressDetail.Text = $"Скачано {downloaded:0.0} из {total / 1048576.0:0.0} МБ · {percent:0}%";
+        }
+        else
+        {
+            BusyProgressBar.IsIndeterminate = true;
+            BusyProgressDetail.Text = $"Скачано {downloaded:0.0} МБ · общий размер неизвестен";
+        }
+    }
+
     private async Task CheckUpdatesAsync()
     {
         if (_busy)
@@ -317,11 +344,13 @@ public partial class MainWindow
             }
             SetStatus("скачиваю и проверяю обновление " + info.Version + "…");
             string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-            await Task.Run(() => UpdateService.DownloadAndLaunch(info, exe, Environment.ProcessId));
+            _showingUpdateDownload = true;
+            var progress = new Progress<UpdateDownloadProgress>(ShowUpdateDownloadProgress);
+            await Task.Run(() => UpdateService.DownloadAndLaunch(info, exe, Environment.ProcessId, progress));
             System.Windows.Application.Current.Shutdown();
         }
-        catch (Exception ex) { SetStatus("ошибка проверки обновления"); MessageBox.Show(this, ex.Message, "Не удалось проверить обновления", MessageBoxButton.OK, MessageBoxImage.Error); }
-        finally { _busy = false; }
+        catch (Exception ex) { SetStatus("не удалось обновить CacheTrim"); MessageBox.Show(this, ex.Message, "Не удалось обновить CacheTrim", MessageBoxButton.OK, MessageBoxImage.Error); }
+        finally { _showingUpdateDownload = false; _busy = false; }
     }
 
     private async Task SetScheduledCleanAsync(bool enabled)

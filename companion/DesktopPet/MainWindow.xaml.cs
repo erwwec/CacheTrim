@@ -699,7 +699,8 @@ public partial class MainWindow : Window
             : System.Windows.Controls.Primitives.PlacementMode.Bottom;
         Menu.Measure(new Size(Menu.Width, double.PositiveInfinity));
         var available = Math.Max(150, Math.Max(spaceAbove, spaceBelow));
-        MenuScroll.MaxHeight = Math.Min(Menu.DesiredSize.Height + 12, available);
+        // Leave room for expanding sections without trapping them below the viewport.
+        MenuScroll.MaxHeight = Math.Min(640, available);
         MenuScroll.ScrollToTop();
         SettingsPopup.IsOpen = true;
     }

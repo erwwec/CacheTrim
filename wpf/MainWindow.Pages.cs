@@ -83,22 +83,31 @@ public partial class MainWindow
         choice.Items.Add("Аниме-аватар");
         choice.SelectedIndex = 0;
         UiButton launch = null;
+        UiButton restart = null;
         launch = AdvancedButton("Запустить выбранного", async () =>
         {
             if (_busy) { MessageBox.Show(this, "Дождись окончания текущей операции.", "CacheTrim", MessageBoxButton.OK, MessageBoxImage.Information); return; }
             launch.IsEnabled = false;
+            restart.IsEnabled = false;
             choice.IsEnabled = false;
             try
             {
                 if (choice.SelectedIndex == 0) await LaunchDesktopPetAsync();
                 else await LaunchAnimeAvatarAsync();
             }
-            finally { choice.IsEnabled = true; launch.IsEnabled = true; }
+            finally { choice.IsEnabled = true; launch.IsEnabled = true; restart.IsEnabled = true; }
         }, true);
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "При первом запуске Клод скачивается из GitHub. После проверки его можно запустить и без интернета. Аниме-аватар входит в обновление; его функции отличаются.", choice, launch));
+        restart = AdvancedButton("Перезапустить выбранного", async () =>
+        {
+            if (_busy) { MessageBox.Show(this, "Дождись окончания текущей операции.", "CacheTrim", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+            launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = false;
+            try { await RestartCompanionAsync(choice.SelectedIndex == 1); }
+            finally { launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = true; }
+        });
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "При первом запуске Клод скачивается из GitHub. После проверки его можно запустить и без интернета. Аниме-аватар входит в обновление; его функции отличаются.", choice, launch, restart));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
-            AdvancedButton("Сведения об аниме-аватаре", ShowAnimeAvatarNotices)));
+            AdvancedButton("Об аниме-аватаре", ShowAnimeAvatarNotices)));
         _pageContent!.Children.Add(cards);
     }
 
@@ -107,22 +116,87 @@ public partial class MainWindow
         using var input = typeof(MainWindow).Assembly.GetManifestResourceStream("CacheTrim.AnimeAvatar.Notices.txt");
         if (input == null) { MessageBox.Show(this, "Сведения об аватаре недоступны.", "Аниме-аватар"); return; }
         using var reader = new StreamReader(input);
-        var details = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brush(Theme.Bg), Foreground = Brush(Theme.Text), Padding = new Thickness(16) };
-        var window = new Window { Title = "Сведения об аниме-аватаре", Width = 700, Height = 520, Owner = this,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = details };
+        string original = reader.ReadToEnd();
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock { Text = "Что это за сведения?", FontSize = 21, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text), Margin = new Thickness(0, 0, 0, 12) });
+        body.Children.Add(new TextBlock {
+            Text = "Это информация от автора аниме-аватара о том, как создавались изображения, анимации и материалы персонажа. Она нужна для ознакомления — здесь ничего настраивать не нужно.\n\n" +
+                   "Аватар — отдельная программа. У предоставленного файла нет исходного кода и цифровой подписи, поэтому его безопасность не подтверждена. Если CacheTrim запущен от администратора, аватар тоже может получить эти права.\n\n" +
+                   "Оригинальные технические сведения и уведомления сохранены ниже без изменений. Упомянутые в них исходные изображения и другие файлы могут отсутствовать в этой сборке.",
+            FontSize = 14, Foreground = Brush(Theme.Text), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) });
+        var details = new TextBox { Text = original, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, Height = 300,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brush(Theme.Bg), Foreground = Brush(Theme.Text), Padding = new Thickness(12) };
+        var expander = new Expander { Header = "Оригинальные технические сведения (на английском)", Content = details, Foreground = Brush(Theme.Text) };
+        body.Children.Add(expander);
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = body, Padding = new Thickness(20) };
+        var window = new Window { Title = "Об аниме-аватаре", Width = 700, Height = 530, MinWidth = 520, MinHeight = 400, Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Brush(Theme.Bg), Foreground = Brush(Theme.Text), Content = scroll };
         window.ShowDialog();
     }
 
-    private async Task LaunchAnimeAvatarAsync()
+    private bool ConfirmAnimeLaunch() => MessageBox.Show(this, "Аниме-аватар — отдельная программа, предоставленная владельцем проекта. Её исходный код и цифровая подпись отсутствуют, безопасность не подтверждена. Она может запуститься с правами администратора, как CacheTrim. Продолжить?", "Аниме-аватар", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+    private async Task LaunchAnimeAvatarAsync(bool alreadyConfirmed = false)
     {
-        if (MessageBox.Show(this, "Аниме-аватар — отдельная программа, предоставленная владельцем проекта. Её исходный код и цифровая подпись отсутствуют, безопасность не подтверждена. Она может запуститься с правами администратора, как CacheTrim. Продолжить?", "Аниме-аватар", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!alreadyConfirmed && !ConfirmAnimeLaunch()) return;
         await RunBusyAsync("проверяется аниме-аватар…", async () =>
         {
             string path = await Task.Run(AnimeAvatarPackage.EnsureExtracted);
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(path)! });
             App.Log("Запрошен запуск аниме-аватара из обновления");
         });
+    }
+
+    private async Task RestartCompanionAsync(bool anime)
+    {
+        // Keep the existing warning before stopping a running unsigned avatar.
+        if (anime && !ConfirmAnimeLaunch()) return;
+        bool stopped = false;
+        _busy = true;
+        SetStatus("Закрываем выбранного компаньона…");
+        try
+        {
+            string target = anime
+                ? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CacheTrim", "Companion", "AnimeAvatar.exe")
+                : PetCache.PathToPet;
+            await Task.Run(() => CloseKnownCompanion(target));
+            stopped = true;
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Не удалось перезапустить компаньона");
+            MessageBox.Show(this, ex.Message, "Перезапуск компаньона", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally { _busy = false; }
+        if (!stopped) return;
+        if (anime) await LaunchAnimeAvatarAsync(alreadyConfirmed: true);
+        else await LaunchDesktopPetAsync();
+    }
+
+    internal static void CloseKnownCompanion(string target)
+    {
+        string expected = System.IO.Path.GetFullPath(target);
+        var processes = System.Diagnostics.Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(expected));
+        try
+        {
+            foreach (var process in processes)
+            {
+                try
+                {
+                    if (process.HasExited) continue;
+                    string actual = process.MainModule?.FileName ?? throw new InvalidOperationException("Не удалось определить файл работающего компаньона.");
+                    if (!string.Equals(System.IO.Path.GetFullPath(actual), expected, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!CompanionWindows.RequestClose(process) || !process.WaitForExit(5000))
+                        throw new InvalidOperationException("Компаньон не ответил на запрос закрытия. Закрой его вручную и попробуй снова.");
+                }
+                catch (System.ComponentModel.Win32Exception ex)
+                {
+                    throw new InvalidOperationException("Не удалось безопасно проверить или закрыть компаньона. Закрой его вручную.", ex);
+                }
+                catch (InvalidOperationException) when (process.HasExited) { }
+            }
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
     }
 
     private async Task LaunchDesktopPetAsync()
@@ -141,14 +215,20 @@ public partial class MainWindow
             if (!PetCache.IsHash(expected)) throw new InvalidOperationException("В приложении отсутствует контрольная сумма питомца. Запуск отменён.");
             string path = PetCache.PathToPet;
             System.IO.FileStream verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
-            if (verified == null && !string.Equals(expected, PetCache.PreviousHash, StringComparison.OrdinalIgnoreCase))
+            if (verified == null)
             {
-                verified = await Task.Run(() => PetCache.TryOpenVerified(path, PetCache.PreviousHash));
-                if (verified != null && MessageBox.Show(this,
-                    "Найдена проверенная предыдущая версия Клода (2.1.15). Запустить её?\n\n" +
-                    "Выбери «Нет», чтобы скачать версию для текущего CacheTrim. Для скачивания нужен интернет.",
-                    "Питомец без интернета", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                { verified.Dispose(); verified = null; }
+                foreach (var previous in PetCache.PreviousVersions)
+                {
+                    if (string.Equals(expected, previous.Hash, StringComparison.OrdinalIgnoreCase)) continue;
+                    verified = await Task.Run(() => PetCache.TryOpenVerified(path, previous.Hash));
+                    if (verified == null) continue;
+                    if (MessageBox.Show(this,
+                        "Найдена проверенная предыдущая версия Клода (" + previous.Version + "). Запустить её?\n\n" +
+                        "Выбери «Нет», чтобы скачать версию для текущего CacheTrim. Для скачивания нужен интернет.",
+                        "Питомец без интернета", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    { verified.Dispose(); verified = null; }
+                    break;
+                }
             }
             if (verified == null)
             {

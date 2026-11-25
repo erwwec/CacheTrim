@@ -6,20 +6,19 @@
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" ShowActivated="False">
     <Grid ClipToBounds="False">
         <Canvas x:Name="PetCanvas" Width="260" Height="320" RenderOptions.BitmapScalingMode="NearestNeighbor">
-            <!-- White thought cloud -->
-            <Ellipse x:Name="ThoughtDotLarge" Canvas.Left="117" Canvas.Top="146" Width="17" Height="17"
-                     Fill="White" Stroke="#FF171717" StrokeThickness="2.5" IsHitTestVisible="False" Visibility="Collapsed" />
-            <Ellipse x:Name="ThoughtDotSmall" Canvas.Left="124" Canvas.Top="162" Width="10" Height="10"
-                     Fill="White" Stroke="#FF171717" StrokeThickness="2.5" IsHitTestVisible="False" Visibility="Collapsed" />
-            <Grid x:Name="SpeechBubble" Canvas.Left="8" Canvas.Top="0" Width="244" Height="174" Visibility="Collapsed">
-                <Path Stretch="Fill" Fill="White" Stroke="#FF111111" StrokeThickness="3"
-                      Data="M 33,139 C 15,139 4,125 9,109 C -1,91 8,69 27,64 C 23,43 38,28 57,34 C 65,13 90,8 105,27 C 119,8 145,12 154,31 C 174,17 196,28 198,48 C 221,48 234,68 223,87 C 240,104 227,125 208,126 C 200,146 177,153 158,140 C 143,161 117,161 103,143 C 85,158 61,154 52,140 C 45,144 37,143 33,139 Z" />
-                <TextBlock x:Name="SpeechText" Margin="37,35,37,51" Foreground="#FF111111"
-                           FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"
-                           VerticalAlignment="Center" HorizontalAlignment="Center" />
+            <Ellipse x:Name="ThoughtDotLarge" Canvas.Left="118" Canvas.Top="149" Width="13" Height="13"
+                     Fill="#FFF7F1FF" Stroke="#FF9F78C9" StrokeThickness="1.5" IsHitTestVisible="False" Visibility="Collapsed" />
+            <Ellipse x:Name="ThoughtDotSmall" Canvas.Left="124" Canvas.Top="165" Width="8" Height="8"
+                     Fill="#FFF7F1FF" Stroke="#FF9F78C9" StrokeThickness="1.3" IsHitTestVisible="False" Visibility="Collapsed" />
+            <Grid x:Name="SpeechBubble" Canvas.Left="9" Canvas.Top="4" Width="242" Height="140" Visibility="Collapsed" IsHitTestVisible="False">
+                <Border CornerRadius="24" Background="#FFF9F5FF" BorderBrush="#FFAE8BCD" BorderThickness="1.5" />
+                <Border Margin="11,10" CornerRadius="16" BorderBrush="#FFE9DCF6" BorderThickness="1">
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" Margin="9,8">
+                        <TextBlock x:Name="SpeechText" Width="198" Foreground="#FF352542" FontSize="15" FontFamily="Segoe UI"
+                                   FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
+                    </Viewbox>
+                </Border>
             </Grid>
-
-            <!-- Detailed transparent sprite images made from the video reference -->
             <Image x:Name="PetSprite" Canvas.Left="74" Canvas.Top="180" Width="120" Height="112"
                    Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
                    MouseLeftButtonDown="Pet_MouseLeftButtonDown" MouseMove="Pet_MouseMove"
@@ -28,52 +27,117 @@
         </Canvas>
         <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=PetSprite}" Placement="Top"
                StaysOpen="True" AllowsTransparency="True" PopupAnimation="Fade">
-            <ScrollViewer x:Name="MenuScroll" Width="253" MaxHeight="580" VerticalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="MenuScroll" Width="310" MaxHeight="620" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
-              <Border x:Name="Menu" Width="235" Padding="9" CornerRadius="9"
-                      Background="#F3281838" BorderBrush="#FFD56BFF" BorderThickness="1">
+              <Border x:Name="Menu" Width="292" Padding="14" CornerRadius="15" Background="#FF211A2C"
+                      BorderBrush="#FF655279" BorderThickness="1" TextElement.FontFamily="Segoe UI" TextElement.FontSize="12">
+                <Border.Resources>
+                    <Style TargetType="{x:Type Button}">
+                        <Setter Property="Foreground" Value="#FFF4EFFA" /><Setter Property="Background" Value="#FF3B3049" />
+                        <Setter Property="BorderBrush" Value="#FF625374" /><Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="Padding" Value="10,7" /><Setter Property="Margin" Value="0,3" /><Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="ButtonSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonSurface" Property="Background" Value="#FF564467" /></Trigger>
+                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonSurface" Property="Background" Value="#FF6B5480" /></Trigger>
+                                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate></Setter.Value></Setter>
+                    </Style>
+                    <Style TargetType="{x:Type TextBox}">
+                        <Setter Property="Background" Value="#FF17121F" /><Setter Property="Foreground" Value="#FFF7F3FA" />
+                        <Setter Property="CaretBrush" Value="White" /><Setter Property="BorderBrush" Value="#FF675576" />
+                        <Setter Property="BorderThickness" Value="1" /><Setter Property="Padding" Value="7,5" />
+                    </Style>
+                    <Style TargetType="{x:Type Expander}">
+                        <Setter Property="Foreground" Value="#FFF7F1FC" /><Setter Property="Margin" Value="0,3" />
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type Expander}">
+                            <Border Background="#FF2B2237" CornerRadius="9" BorderBrush="#FF4C3D5A" BorderThickness="1">
+                                <StackPanel>
+                                    <ToggleButton IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                                  Content="{TemplateBinding Header}" Foreground="{TemplateBinding Foreground}" Cursor="Hand" Focusable="True">
+                                        <ToggleButton.Template><ControlTemplate TargetType="{x:Type ToggleButton}">
+                                            <Border x:Name="HeaderSurface" Background="Transparent" CornerRadius="9" Padding="10,10">
+                                                <DockPanel>
+                                                    <TextBlock x:Name="Arrow" DockPanel.Dock="Right" Text="▸" FontSize="15" Foreground="#FFC9A8EF" Margin="8,0,0,0" />
+                                                    <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+                                                </DockPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Text" Value="▾" /></Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HeaderSurface" Property="Background" Value="#FF3C2F4D" /></Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate></ToggleButton.Template>
+                                    </ToggleButton>
+                                    <ContentPresenter x:Name="SectionContent" Visibility="Collapsed" Margin="10,0,10,10" />
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers><Trigger Property="IsExpanded" Value="True"><Setter TargetName="SectionContent" Property="Visibility" Value="Visible" /></Trigger></ControlTemplate.Triggers>
+                        </ControlTemplate></Setter.Value></Setter>
+                    </Style>
+                </Border.Resources>
                 <StackPanel>
-                    <TextBlock Text="Клод" Foreground="White" FontWeight="Bold" Margin="2,0,2,5" />
-                    <Button Content="Закрыть меню" Click="CloseMenu_Click" Margin="0,2" Padding="6,3" />
-                    <TextBlock x:Name="SizeLabel" Text="Размер: 100%" Foreground="White" Margin="2,5,2,0" />
-                    <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="2" Value="0.6" Width="205"
-                            ValueChanged="SizeSlider_ValueChanged" Margin="0,0,0,4" />
-                    <TextBlock x:Name="OpacityLabel" Foreground="White" Margin="2,4,2,0" />
-                    <Slider x:Name="OpacitySlider" Minimum="0.35" Maximum="1" Value="1" Width="205" ValueChanged="OpacitySlider_ValueChanged" />
-                    <Button Content="Запомнить стартовое положение" Click="RememberPosition_Click" Margin="0,2" Padding="6,3" />
-                    <Button Content="Сбросить положение" Click="ResetPosition_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="PetAutostartButton" Content="Автозапуск: выкл" Click="PetAutostart_Click" Margin="0,2" Padding="6,3" />
-                    <TextBlock Text="Напоминание (пока Клод запущен)" Foreground="White" Margin="2,6,2,2" />
-                    <ComboBox x:Name="ReminderInterval" SelectedIndex="0" Margin="0,2">
-                        <ComboBoxItem Content="Выключено" /><ComboBoxItem Content="Каждые 30 минут" />
-                        <ComboBoxItem Content="Каждый час" /><ComboBoxItem Content="Каждые 2 часа" />
-                    </ComboBox>
-                    <TextBox x:Name="ReminderText" Text="Пора сделать перерыв!" MaxLength="80" Margin="0,2" />
-                    <Button Content="Сохранить напоминание" Click="SaveReminder_Click" Margin="0,2" Padding="6,3" />
-                    <TextBlock Text="Быстрые команды" Foreground="White" Margin="2,7,2,2" />
-                    <Button Content="Показать рабочий стол" Click="ShowDesktop_Click" Margin="0,2" Padding="6,3" />
-                    <Button Content="Открыть папку загрузок" Click="OpenDownloads_Click" Margin="0,2" Padding="6,3" />
-                    <TextBlock x:Name="ChatterLabel" Foreground="White" Margin="2,4,2,0" />
-                    <Slider x:Name="ChatterSlider" Minimum="0" Maximum="2" Value="1" Width="205"
-                            ValueChanged="ChatterSlider_ValueChanged" Margin="0,0,0,3" />
-                    <TextBlock x:Name="JumpLabel" Foreground="White" Margin="2,3,2,0" />
-                    <Slider x:Name="JumpSlider" Minimum="0.5" Maximum="2" Value="1" Width="205"
-                            ValueChanged="JumpSlider_ValueChanged" Margin="0,0,0,3" />
-                    <Button x:Name="QuietButton" Content="Не отвлекать: выкл" Click="Quiet_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="BringSecretButton" Content="Принеси секрет" Click="BringSecret_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="SurpriseButton" Content="Секреты: вкл" Click="Surprise_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="SeatButton" Content="Место: свободно" Click="Seat_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="CollectionButton" Content="Коллекция: вкл" Click="Collection_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="RoutineButton" Content="Распорядок: вкл" Click="Routine_Click" Margin="0,2" Padding="6,3" />
-                    <TextBlock Text="Свои фразы (по одной на строку)" Foreground="White" Margin="2,5,2,2" />
-                    <TextBox x:Name="PhraseTextBox" Height="72" MaxLength="500" AcceptsReturn="True"
-                             TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" />
-                    <Button Content="Сохранить фразы" Click="SavePhrases_Click" Margin="0,3" Padding="6,3" />
-                    <Button Content="Прыгнуть" Click="Jump_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="AudioButton" Content="Реакция на звук: вкл" Click="Audio_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="LyricsButton" Content="Текст песни: выкл" Click="Lyrics_Click" Margin="0,2" Padding="6,3" />
-                    <Button x:Name="LyricsStatusButton" Content="Почему нет текста песни?" Click="LyricsStatus_Click" Margin="0,2" Padding="6,3" />
-                    <Button Content="Выход" Click="Exit_Click" Margin="0,2" Padding="6,3" />
+                    <TextBlock Text="Клод" FontSize="19" FontWeight="SemiBold" Foreground="#FFFFFFFF" />
+                    <TextBlock Text="Твой компаньон на рабочем столе" Foreground="#FFD2C1DF" FontSize="11" Margin="0,2,0,10" />
+                    <Expander x:Name="AppearanceSection" Header="Внешний вид и положение" IsExpanded="True">
+                        <StackPanel>
+                            <TextBlock x:Name="SizeLabel" Text="Размер: 100%" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
+                            <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="2" Value="0.6" HorizontalAlignment="Stretch" ValueChanged="SizeSlider_ValueChanged" Margin="0,0,0,6" />
+                            <TextBlock x:Name="OpacityLabel" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
+                            <Slider x:Name="OpacitySlider" Minimum="0.35" Maximum="1" Value="1" HorizontalAlignment="Stretch" ValueChanged="OpacitySlider_ValueChanged" Margin="0,0,0,6" />
+                            <Button Content="Запомнить стартовое положение" Click="RememberPosition_Click" />
+                            <Button Content="Сбросить положение" Click="ResetPosition_Click" />
+                            <Button x:Name="PetAutostartButton" Content="Автозапуск: выкл" Click="PetAutostart_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="RemindersSection" Header="Напоминания">
+                        <StackPanel>
+                            <TextBlock Text="Работают, пока Клод запущен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,6" />
+                            <ComboBox x:Name="ReminderInterval" SelectedIndex="0" Margin="0,2,0,5" MinHeight="30">
+                                <ComboBoxItem Content="Выключено" /><ComboBoxItem Content="Каждые 30 минут" />
+                                <ComboBoxItem Content="Каждый час" /><ComboBoxItem Content="Каждые 2 часа" />
+                            </ComboBox>
+                            <TextBox x:Name="ReminderText" Text="Пора сделать перерыв!" MaxLength="80" Margin="0,2,0,4" />
+                            <Button Content="Сохранить напоминание" Click="SaveReminder_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="CommandsSection" Header="Быстрые команды">
+                        <StackPanel>
+                            <Button Content="Показать рабочий стол" Click="ShowDesktop_Click" />
+                            <Button Content="Открыть папку загрузок" Click="OpenDownloads_Click" />
+                            <Button Content="Прыгнуть" Click="Jump_Click" />
+                            <Button x:Name="BringSecretButton" Content="Принеси секрет" Click="BringSecret_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="BehaviorSection" Header="Поведение и секреты">
+                        <StackPanel>
+                            <TextBlock x:Name="ChatterLabel" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
+                            <Slider x:Name="ChatterSlider" Minimum="0" Maximum="2" Value="1" HorizontalAlignment="Stretch" ValueChanged="ChatterSlider_ValueChanged" Margin="0,0,0,5" />
+                            <TextBlock x:Name="JumpLabel" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
+                            <Slider x:Name="JumpSlider" Minimum="0.5" Maximum="2" Value="1" HorizontalAlignment="Stretch" ValueChanged="JumpSlider_ValueChanged" Margin="0,0,0,5" />
+                            <Button x:Name="QuietButton" Content="Не отвлекать: выкл" Click="Quiet_Click" />
+                            <Button x:Name="SurpriseButton" Content="Секреты: вкл" Click="Surprise_Click" />
+                            <Button x:Name="SeatButton" Content="Место: свободно" Click="Seat_Click" />
+                            <Button x:Name="CollectionButton" Content="Коллекция: вкл" Click="Collection_Click" />
+                            <Button x:Name="RoutineButton" Content="Распорядок: вкл" Click="Routine_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="MusicSection" Header="Фразы, музыка и звук">
+                        <StackPanel>
+                            <TextBlock Text="Свои фразы — по одной на строку" Foreground="#FFF7F1FC" TextWrapping="Wrap" Margin="0,4,0,5" />
+                            <TextBox x:Name="PhraseTextBox" Height="72" MaxLength="500" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                            <Button Content="Сохранить фразы" Click="SavePhrases_Click" />
+                            <Button x:Name="AudioButton" Content="Реакция на звук: вкл" Click="Audio_Click" />
+                            <Button x:Name="LyricsButton" Content="Текст песни: выкл" Click="Lyrics_Click" />
+                            <Button x:Name="LyricsStatusButton" Content="Почему нет текста песни?" Click="LyricsStatus_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Button Content="Закрыть меню" Click="CloseMenu_Click" Margin="0,12,0,3" />
+                    <Button Content="Выход из Клода" Click="Exit_Click" />
                 </StackPanel>
               </Border>
             </ScrollViewer>

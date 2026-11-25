@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress']
+    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
   pull_request:
     branches: [main]
 
@@ -48,12 +48,22 @@ jobs:
       - name: Check Desktop Acrylic backdrop
         shell: pwsh
         run: .\tests\SmokeGlass.ps1
+      - name: Test WPF glass frame setup
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\GlassFrameTests\GlassFrameTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'WPF glass frame test failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
           dotnet run --project .\tests\CleanerSafetyTests\CleanerSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Cleaner safety tests failed' }
 
+      - name: Test safe companion restart
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CompanionRestartTests\CompanionRestartTests.csproj -c Release -- .\dist\pet-publish\DesktopPet.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Companion restart test failed' }
       - name: Test pet reminders and autostart policy
         shell: pwsh
         run: |
