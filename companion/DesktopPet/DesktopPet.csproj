@@ -14,11 +14,13 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Assets\claude_*.png" />
     <Resource Include="Assets\claude_*.png" />
     <!-- Text-encoded so the experimental artwork is separately versioned from the classic sprites. -->
     <EmbeddedResource Include="Assets\claude_experimental.b64" LogicalName="DesktopPet.ExperimentalSprite" />
+    <EmbeddedResource Include="Assets\presentation_template.b64" LogicalName="DesktopPet.PresentationTemplate" />
   </ItemGroup>
 </Project>
