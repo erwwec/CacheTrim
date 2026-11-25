@@ -81,7 +81,7 @@ public partial class MainWindow
         WpfComboBox choice = new() { Width = 250, MinHeight = 34, ToolTip = "Выбери компаньона" };
         choice.Items.Add("Клод");
         choice.Items.Add("Аниме-аватар");
-        choice.Items.Add("Клод · тестовая модель");
+        choice.Items.Add("Клод V2");
         choice.SelectedIndex = 0;
         UiButton launch = null;
         UiButton restart = null;
@@ -105,7 +105,7 @@ public partial class MainWindow
             try { await RestartCompanionAsync(choice.SelectedIndex == 1, experimental: choice.SelectedIndex == 2); }
             finally { launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = true; }
         });
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Обычный и тестовый Клод — один питомец с разными моделями. Тестовая модель пока имеет одну позу. Если Клод уже запущен, выбери модель в его меню или нажми «Перезапустить выбранного». При первом запуске нужен интернет; аниме-аватар входит в обновление.", choice, launch, restart));
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Обычный Клод и Клод V2 — разные модели одного питомца. В V2 доступны простые голосовые и текстовые команды; модель пока имеет одну позу. Если Клод уже запущен, выбери модель в его меню или нажми «Перезапустить выбранного». При первом запуске нужен интернет; аниме-аватар входит в обновление.", choice, launch, restart));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
             AdvancedButton("Об аниме-аватаре", ShowAnimeAvatarNotices)));
