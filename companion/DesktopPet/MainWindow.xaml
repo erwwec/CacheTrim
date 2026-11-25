@@ -185,6 +185,13 @@
                             <TextBlock Text="Распознавание речи" Foreground="White" Margin="0,8,0,2" />
                             <ComboBox x:Name="AssistantSpeechProvider" SelectionChanged="AssistantProvider_Changed"><ComboBoxItem Content="Локально: Vosk (русский, бесплатно)" /><ComboBoxItem Content="Groq Whisper (облако)" /></ComboBox>
                             <TextBlock Text="Для OpenRouter используется только бесплатный роутер; модели и лимиты меняются. Для Groq Whisper нужен отдельный ключ Groq; проверь тариф. Локальная модель может ошибаться." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
+                            <Expander Header="Как получить ключ ИИ">
+                                <StackPanel>
+                                    <TextBlock Text="1. Выбери выше нужный провайдер ИИ.&#10;2. Открой его страницу кнопкой ниже, зарегистрируйся или войди.&#10;3. В разделе API Keys создай ключ (Create API Key / Create Key) и скопируй его.&#10;4. Вернись сюда, вставь ключ в поле и нажми «Сохранить ключ»." Foreground="#FFE8D9F4" TextWrapping="Wrap" Margin="0,5" />
+                                    <UniformGrid Columns="2"><Button x:Name="OpenOpenRouterKeysButton" Content="Ключ OpenRouter ↗" Click="OpenOpenRouterKeys_Click" Margin="0,3,4,3" /><Button x:Name="OpenGroqKeysButton" Content="Ключ Groq ↗" Click="OpenGroqKeys_Click" Margin="4,3,0,3" /></UniformGrid>
+                                    <TextBlock Text="Никому не отправляй ключ и не публикуй его. Если для речи выбран Groq Whisper, сохрани ключ Groq отдельно: выбери Groq, вставь ключ и сохрани; затем можешь вернуться на OpenRouter. Тарифы и лимиты проверь в аккаунте сервиса." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
+                                </StackPanel>
+                            </Expander>
                             <TextBlock x:Name="AssistantKeyLabel" Text="Ключ Groq" Foreground="White" Margin="0,5,0,2" />
                             <TextBlock Text="Ключ сохраняется отдельно для выбранного провайдера, защищённый Windows." Foreground="#FFD2C1DF" TextWrapping="Wrap" />
                             <PasswordBox x:Name="AssistantApiKey" MaxLength="256" ToolTip="Ключ выбранного провайдера" Margin="0,5" Padding="7" />
@@ -196,7 +203,7 @@
                             <CheckBox x:Name="AssistantAutoControl" IsChecked="True" Content="Автоматически выполнять шаги" Foreground="White" Margin="0,10,0,3" />
                             <CheckBox x:Name="AssistantVoiceStop" IsChecked="True" Content="Слушать «стоп» во время задачи" Foreground="White" Margin="0,4,0,3" />
                             <TextBlock Text="ИИ может ошибиться и изменить или отправить данные. Фильтр опасных действий неполный. Следи за работой и держи кнопку остановки под рукой: голосовой «стоп» может не сработать и не отменяет сделанное." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
-                            <TextBlock Text="Вызов «Джарвис» постоянно слушает микрофон локально. Возможно ложное срабатывание ; последующая речь обрабатывается выбранным способом. Во время записи самой задачи «стоп» отдельно не слушается." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
+                            <TextBlock Text="Вызов «Джарвис» постоянно слушает микрофон локально. Возможно ложное срабатывание; последующая речь обрабатывается выбранным способом. Во время записи самой задачи «стоп» отдельно не слушается." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
                             <Button x:Name="AssistantScreenButton" Content="Спросить ИИ об основном экране" Click="AskScreen_Click" />
                             <TextBlock Text="Кнопка отправляет снимок основного экрана выбранному ИИ; это просмотр, не управление." Foreground="#FFD2C1DF" TextWrapping="Wrap" />
                         </StackPanel>

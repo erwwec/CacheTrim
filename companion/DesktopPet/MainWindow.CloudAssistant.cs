@@ -37,6 +37,13 @@ public partial class MainWindow
         AssistantCloudStatus.Text = "Настройки сохранены. При смене ИИ история очищена.";
         SaveSettings();
     }
+    private void OpenOpenRouterKeys_Click(object sender, RoutedEventArgs e) => OpenKeyPage("https://openrouter.ai/settings/keys");
+    private void OpenGroqKeys_Click(object sender, RoutedEventArgs e) => OpenKeyPage("https://console.groq.com/keys");
+    private void OpenKeyPage(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { AssistantCloudStatus.Text = "Не удалось открыть браузер. Проверь браузер по умолчанию."; }
+    }
     private async Task<string> TranscribeAsync(byte[] audio, bool local, string? groqKey, CancellationToken ct)
     {
         if (local) return await OfflineSpeech.TranscribeAsync(audio, ct);
