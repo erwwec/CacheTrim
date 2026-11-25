@@ -47,6 +47,7 @@ namespace CacheTrim
         public int UiDensity = 1;
         public int HotkeyOpen;
         public int HotkeyPet;
+        public int HotkeyAnime;
 
         public Config Clone()
         {
@@ -128,6 +129,7 @@ namespace CacheTrim
                 c.GlassBackgroundBlur = Math.Max(0, Math.Min(100, Number(map, "glass_background_blur", c.GlassBackgroundBlur)));
                 c.HotkeyOpen = Math.Clamp(Number(map, "hotkey_open", 0), 0, 6);
                 c.HotkeyPet = Math.Clamp(Number(map, "hotkey_pet", 0), 0, 6);
+                c.HotkeyAnime = Math.Clamp(Number(map, "hotkey_anime", 0), 0, 6);
                 c.UiDensity = Math.Max(0, Math.Min(2, Number(map, "ui_density", c.UiDensity)));
             }
             catch (Exception)
@@ -172,6 +174,7 @@ namespace CacheTrim
                 sb.AppendLine("glass_background_blur=" + GlassBackgroundBlur.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("hotkey_open=" + HotkeyOpen.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("hotkey_pet=" + HotkeyPet.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine("hotkey_anime=" + HotkeyAnime.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("ui_density=" + UiDensity.ToString(CultureInfo.InvariantCulture));
                 File.WriteAllText(temporaryPath, sb.ToString(), new UTF8Encoding(false));
                 if (File.Exists(ConfigPath))

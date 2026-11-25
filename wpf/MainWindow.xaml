@@ -8,6 +8,23 @@
         Background="#FF0F1113" ShowInTaskbar="True"
         Loaded="OnWindowLoaded" StateChanged="OnWindowStateChanged" Closed="OnWindowClosed">
     <Window.Resources>
+        <Style x:Key="CaptionButton" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="#FFECEEF2" />
+            <Setter Property="BorderThickness" Value="0" /><Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" /><Setter Property="FontSize" Value="11" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type Button}">
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Margin="2,4">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#445F6F7D" /></Trigger>
+                    <MultiTrigger><MultiTrigger.Conditions><Condition Property="Tag" Value="Close" /><Condition Property="IsMouseOver" Value="True" /></MultiTrigger.Conditions>
+                        <Setter TargetName="Surface" Property="Background" Value="#FFC42B1C" />
+                    </MultiTrigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.7" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
         <Style TargetType="{x:Type CheckBox}">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             <Setter Property="Cursor" Value="Hand" />
@@ -64,12 +81,12 @@
                         <TextBlock Text=" · оптимизатор системы" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <ui:Button Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Appearance="Transparent" Width="42" Height="34" Click="OnMinimizeClick"
-                                   shell:WindowChrome.IsHitTestVisibleInChrome="True" />
-                        <ui:Button x:Name="MaximizeButton" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Appearance="Transparent" Width="42" Height="34" Click="OnMaximizeClick"
-                                   shell:WindowChrome.IsHitTestVisibleInChrome="True" />
-                        <ui:Button Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Appearance="Transparent" Width="42" Height="34" Click="OnCloseClick"
-                                   shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                        <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Width="42" Height="38" ToolTip="Свернуть" Click="OnMinimizeClick"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                        <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Width="42" Height="38" ToolTip="Развернуть или восстановить" Click="OnMaximizeClick"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                        <Button Style="{StaticResource CaptionButton}" Content="&#xE8BB;" Width="42" Height="38" ToolTip="Закрыть" Tag="Close" Click="OnCloseClick"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -99,7 +116,9 @@
                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             <TextBlock x:Name="BusyOperationText" Margin="0,4,0,8" FontSize="13" TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <ProgressBar Height="6" IsIndeterminate="True" Foreground="{DynamicResource SystemAccentColorBrush}" />
+                            <ProgressBar x:Name="BusyProgressBar" Height="8" IsIndeterminate="True" Minimum="0" Maximum="100" Foreground="{DynamicResource SystemAccentColorBrush}" />
+                            <TextBlock x:Name="BusyProgressDetail" Visibility="Collapsed" Margin="0,7,0,0" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="Пожалуйста, подожди — время зависит от операции." Margin="0,7,0,0" FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
