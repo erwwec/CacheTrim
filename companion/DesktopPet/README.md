@@ -18,7 +18,13 @@ Settings are saved under `%LOCALAPPDATA%\ClaudeDesktopPet\settings.ini` and rest
 
 Recent keyboard/mouse activity is checked through Windows last-input time. The pet also checks keyboard key states to detect typing activity; it does not store or transmit typed text. At 10 seconds idle Claude switches to the phone pose; at 2 minutes he sleeps. He may take short tea, reading, stretching or desk-nap breaks, with morning/evening behavior controlled by the routine toggle. While working or acting out a short scene, he does not jump autonomously. In his phone/free-time pose he can hop. He turns toward a nearby cursor. He saves up to eight found items in his settings; no collection shelf is currently displayed. Automatic collecting can be switched off. Window surfaces are sampled from visible top-level app windows twice per second. If a supporting window vanishes, he falls or tries a nearby ledge. This is approximate and can include windows behind the pet.
 
-Свои фразы вводятся по одной на строку; ползунок частоты управляет тем, как часто появляются они и встроенные реплики по ситуации. Реакция на звук читает только уровень системного аудио. Питомец не определяет песню и не распознаёт речь, аудио не сохраняется. Если устройство вывода отключится, меню покажет статус ошибки; нажми кнопку звука, чтобы выключить реакцию, а затем снова включи для повторного подключения.
+Свои фразы вводятся по одной на строку; ползунок частоты управляет тем, как часто появляются они и встроенные реплики по ситуации. Реакция на звук читает только уровень системного аудио. Эта функция не определяет песню и не распознаёт речь; аудио не сохраняется. Если устройство вывода отключится, меню покажет статус ошибки; нажми кнопку звука, чтобы выключить реакцию, а затем снова включи для повторного подключения.
+
+## Помощник Клода V2 (первый этап)
+
+Только в модели «Клод V2» в меню есть «Помощник»: точные текстовые команды и необязательное распознавание одной голосовой команды после нажатия кнопки и подтверждения. Микрофон не запускается автоматически; прослушивание можно остановить, оно также прекращается при переключении на обычного Клода или закрытии питомца. Ответы выводятся в облаке. Поддерживаются только перечисленные в меню безопасные команды, без свободного диалога с ИИ, постоянного прослушивания, голосовых ответов и произвольных системных команд. По мотивам проекта Jarvis (https://github.com/EliseyRotar/jarvis-ai), его код не используется.
+
+Для голоса нужен установленный совместимый русский SAPI-модуль распознавания Windows, работающий микрофон и разрешения. Наличие русского языка интерфейса само по себе не гарантирует наличие SAPI-распознавателя. Если он отсутствует или микрофон недоступен, команды можно вводить текстом. Сам CacheTrim не сохраняет и не отправляет запись; обработка зависит от установленного распознавателя. Голос и фактическую работу на устройствах следует отдельно проверить на Windows.
 
 ## Синхронизированный текст песни
 
