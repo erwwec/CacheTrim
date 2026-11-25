@@ -81,6 +81,7 @@ public partial class MainWindow
         WpfComboBox choice = new() { Width = 250, MinHeight = 34, ToolTip = "Выбери компаньона" };
         choice.Items.Add("Клод");
         choice.Items.Add("Аниме-аватар");
+        choice.Items.Add("Клод · тестовая модель");
         choice.SelectedIndex = 0;
         UiButton launch = null;
         UiButton restart = null;
@@ -92,8 +93,8 @@ public partial class MainWindow
             choice.IsEnabled = false;
             try
             {
-                if (choice.SelectedIndex == 0) await LaunchDesktopPetAsync();
-                else await LaunchAnimeAvatarAsync();
+                if (choice.SelectedIndex == 1) await LaunchAnimeAvatarAsync();
+                else await LaunchDesktopPetAsync(experimental: choice.SelectedIndex == 2);
             }
             finally { choice.IsEnabled = true; launch.IsEnabled = true; restart.IsEnabled = true; }
         }, true);
@@ -101,10 +102,10 @@ public partial class MainWindow
         {
             if (_busy) { MessageBox.Show(this, "Дождись окончания текущей операции.", "CacheTrim", MessageBoxButton.OK, MessageBoxImage.Information); return; }
             launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = false;
-            try { await RestartCompanionAsync(choice.SelectedIndex == 1); }
+            try { await RestartCompanionAsync(choice.SelectedIndex == 1, experimental: choice.SelectedIndex == 2); }
             finally { launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = true; }
         });
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "При первом запуске Клод скачивается из GitHub. После проверки его можно запустить и без интернета. Аниме-аватар входит в обновление; его функции отличаются.", choice, launch, restart));
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Обычный и тестовый Клод — один питомец с разными моделями. Тестовая модель пока имеет одну позу. Если Клод уже запущен, выбери модель в его меню или нажми «Перезапустить выбранного». При первом запуске нужен интернет; аниме-аватар входит в обновление.", choice, launch, restart));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
             AdvancedButton("Об аниме-аватаре", ShowAnimeAvatarNotices)));
@@ -153,7 +154,7 @@ public partial class MainWindow
         });
     }
 
-    private async Task RestartCompanionAsync(bool anime)
+    private async Task RestartCompanionAsync(bool anime, bool experimental = false)
     {
         // Keep the existing warning before stopping a running unsigned avatar.
         if (anime && !ConfirmAnimeLaunch()) return;
@@ -176,7 +177,7 @@ public partial class MainWindow
         finally { _busy = false; }
         if (!stopped) return;
         if (anime) await LaunchAnimeAvatarAsync(alreadyConfirmed: true);
-        else await LaunchDesktopPetAsync();
+        else await LaunchDesktopPetAsync(experimental);
     }
 
     internal static bool IsKnownCompanionRunning(string target)
@@ -230,7 +231,7 @@ public partial class MainWindow
         finally { foreach (var process in processes) process.Dispose(); }
     }
 
-    private async Task LaunchDesktopPetAsync()
+    private async Task LaunchDesktopPetAsync(bool? experimental = null)
     {
         await RunBusyAsync("Проверяем файл Клода…", async () =>
         {
@@ -247,7 +248,8 @@ public partial class MainWindow
             System.IO.FileStream verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
             if (verified == null)
             {
-                foreach (var previous in PetCache.PreviousVersions)
+                // Previous releases do not contain the experimental model.
+                foreach (var previous in experimental == true ? Array.Empty<(string Version, string Hash)>() : PetCache.PreviousVersions)
                 {
                     if (string.Equals(expected, previous.Hash, StringComparison.OrdinalIgnoreCase)) continue;
                     verified = await Task.Run(() => PetCache.TryOpenVerified(path, previous.Hash));
@@ -271,7 +273,11 @@ public partial class MainWindow
                 if (verified == null) throw new InvalidOperationException("Файл питомца не прошёл проверку. Запуск отменён.");
             }
             using (verified)
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = false });
+            {
+                var start = new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = false };
+                if (experimental.HasValue) start.ArgumentList.Add(experimental.Value ? "--model=experimental" : "--model=classic");
+                System.Diagnostics.Process.Start(start);
+            }
             App.Log("Проверенный Desktop Pet запущен из вкладки CacheTrim");
         });
     }
