@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private bool _isClosing;
     private bool _initializing = true;
     private bool _experimentalModel;
+    private VoiceCommandSession? _voiceSession;
     private double _pendingAudioLevel;
     private double _audioLevel;
     private double _velocityX;
@@ -110,6 +111,7 @@ public partial class MainWindow : Window
         }
         InitializeComponent();
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
+        AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         PetCanvas.LayoutTransform = new ScaleTransform(_uiScale, _uiScale);
         Width = 260 * _uiScale;
         Height = 320 * _uiScale;
@@ -434,6 +436,8 @@ public partial class MainWindow : Window
     {
         if (_initializing || ModelSelector.SelectedIndex < 0) return;
         _experimentalModel = ModelSelector.SelectedIndex == 1;
+        if (!_experimentalModel) StopVoice();
+        AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         PetSprite.Source = SpriteFor(_activity, _miniSceneActive);
         SaveSettings();
     }
@@ -1139,6 +1143,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isClosing = true;
+        StopVoice();
         _reminderTimer.Stop(); _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
         _lyricsCancellation.Cancel(); _lyricsCancellation.Dispose(); _lyricsService?.Dispose();
         StopAudioCapture();
