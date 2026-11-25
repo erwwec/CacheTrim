@@ -16,5 +16,7 @@
   <ItemGroup>
     <None Remove="Assets\claude_*.png" />
     <Resource Include="Assets\claude_*.png" />
+    <!-- Text-encoded so the experimental artwork is separately versioned from the classic sprites. -->
+    <EmbeddedResource Include="Assets\claude_experimental.b64" LogicalName="DesktopPet.ExperimentalSprite" />
   </ItemGroup>
 </Project>

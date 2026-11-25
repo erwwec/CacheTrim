@@ -6,6 +6,8 @@
 
 Правый клик по Клоду открывает меню настроек в масштабе 100%, независимо от размера питомца. Меню разделено на раскрываемые разделы: внешний вид, напоминания, команды, поведение, музыка и фразы. Там можно настроить размер, реплики, прыжки, режим «Не отвлекать», секреты, любимый угол, коллекцию, распорядок дня, свои фразы и реакцию на звук. Перетащи Клода левой кнопкой и отпусти, чтобы бросить. Клик по спящему питомцу будит его.
 
+В разделе «Внешний вид» можно переключиться между обычным Клодом и новой тестовой моделью; выбор сохраняется. Тестовая модель пока имеет одну позу для всех состояний, поведение остаётся общим. Оригинальные четыре изображения не изменены. Тестовый рисунок сгенерирован ИИ по исходному Клоду и сохранён отдельно как `Assets/claude_experimental.b64`; фон удалён при подготовке.
+
 Settings are saved under `%LOCALAPPDATA%\ClaudeDesktopPet\settings.ini` and restored on next launch.
 
 В меню также доступны непрозрачность, запоминание стартового положения (в пределах рабочей области основного экрана), добровольный автозапуск и периодические напоминания со своим текстом. Напоминание работает только пока питомец запущен и откладывается во время режима «Не отвлекать»; оно временно заменяет строку песни. Кнопки позволяют показать рабочий стол и открыть папку загрузок. Автозапуск использует HKCU Run, включается только с согласия и запускает файл напрямую от текущего пользователя без проверки CacheTrim при каждом входе. Если запись извне изменилась, питомец её не перезаписывает и не удаляет.
@@ -16,7 +18,7 @@ Settings are saved under `%LOCALAPPDATA%\ClaudeDesktopPet\settings.ini` and rest
 
 Recent keyboard/mouse activity is checked through Windows last-input time. The pet also checks keyboard key states to detect typing activity; it does not store or transmit typed text. At 10 seconds idle Claude switches to the phone pose; at 2 minutes he sleeps. He may take short tea, reading, stretching or desk-nap breaks, with morning/evening behavior controlled by the routine toggle. While working or acting out a short scene, he does not jump autonomously. In his phone/free-time pose he can hop. He turns toward a nearby cursor. He saves up to eight found items in his settings; no collection shelf is currently displayed. Automatic collecting can be switched off. Window surfaces are sampled from visible top-level app windows twice per second. If a supporting window vanishes, he falls or tries a nearby ledge. This is approximate and can include windows behind the pet.
 
-Свои фразы вводятся по одной на строку; ползунок частоты управляет тем, как часто появляются они и встроенные реплики по ситуации. Реакция на звук читает только уровень системного аудио. Питомец не определяет песню и не распознаёт речь, аудио не сохраняется. Если устройство вывода отключится, меню покажет статус ошибки; нажми кнопку звука для повторного подключения.
+Свои фразы вводятся по одной на строку; ползунок частоты управляет тем, как часто появляются они и встроенные реплики по ситуации. Реакция на звук читает только уровень системного аудио. Питомец не определяет песню и не распознаёт речь, аудио не сохраняется. Если устройство вывода отключится, меню покажет статус ошибки; нажми кнопку звука, чтобы выключить реакцию, а затем снова включи для повторного подключения.
 
 ## Синхронизированный текст песни
 

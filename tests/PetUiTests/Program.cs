@@ -21,6 +21,18 @@ internal static class Program
             void Show(string text, bool lyrics) => speech.Invoke(pet, new object[] { text, lyrics });
             void Hide() => hide.Invoke(pet, null);
             void Check(bool ok, string label) { if (!ok) throw new Exception(label); Console.WriteLine("OK: " + label); }
+            var selector = (System.Windows.Controls.ComboBox)Element("ModelSelector");
+            var sprite = (System.Windows.Controls.Image)Element("PetSprite");
+            selector.SelectedIndex = 0;
+            var classic = sprite.Source;
+            selector.SelectedIndex = 1;
+            Check(sprite.Source != null && !ReferenceEquals(sprite.Source, classic), "test model is distinct from the original");
+            Check(File.ReadAllLines(Path.Combine(tempDir, "settings.ini"))[17] == "True", "test model selection is saved");
+            type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, false);
+            type.GetMethod("LoadSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
+            Check((bool)type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)!, "test model selection is restored");
+            selector.SelectedIndex = 0;
+            Check(ReferenceEquals(sprite.Source, classic), "original model can be restored without replacement");
             var sections = new[] { "AppearanceSection", "RemindersSection", "CommandsSection", "BehaviorSection", "MusicSection" };
             Check(sections.All(name => Element(name) is System.Windows.Controls.Expander), "all pet menu groups exist");
             var music = (System.Windows.Controls.Expander)Element("MusicSection");
