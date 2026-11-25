@@ -436,7 +436,7 @@ public partial class MainWindow : Window
     {
         if (_initializing || ModelSelector.SelectedIndex < 0) return;
         _experimentalModel = ModelSelector.SelectedIndex == 1;
-        if (!_experimentalModel) StopVoice();
+        if (!_experimentalModel) { StopVoice(); StopCloud(); }
         AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         PetSprite.Source = SpriteFor(_activity, _miniSceneActive);
         SaveSettings();
@@ -1144,6 +1144,7 @@ public partial class MainWindow : Window
     {
         _isClosing = true;
         StopVoice();
+        StopCloud();
         _reminderTimer.Stop(); _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
         _lyricsCancellation.Cancel(); _lyricsCancellation.Dispose(); _lyricsService?.Dispose();
         StopAudioCapture();
