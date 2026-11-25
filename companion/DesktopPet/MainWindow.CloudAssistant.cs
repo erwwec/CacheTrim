@@ -104,6 +104,7 @@ public partial class MainWindow
         AssistantCloudButton.Content = "Остановить запрос";
         AssistantScreenButton.Content = "Остановить просмотр";
         AssistantCloudStatus.Text = "Делаю и отправляю снимок основного экрана в Groq…";
+        bool restoreAssistant = HideAssistantForScreenCapture();
         try
         {
             // Hide the menu so it doesn't cover the requested screen; give the popup time to close.
@@ -122,6 +123,7 @@ public partial class MainWindow
         {
             if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantScreenButton.Content = "Спросить ИИ об экране"; }
             cts.Dispose();
+            RestoreAssistantAfterScreenCapture(restoreAssistant);
         }
     }
     private void CloudVoice_Click(object sender, RoutedEventArgs e)

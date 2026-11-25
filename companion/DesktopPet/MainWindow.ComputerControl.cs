@@ -44,6 +44,7 @@ public partial class MainWindow
         var panel = new ComputerControlPanel(() => { if (!cts.IsCancellationRequested) cts.Cancel(); });
         var previous = new List<string>();
         EmergencyStopSession? stopSession = null;
+        bool restoreAssistant = HideAssistantForScreenCapture();
         int voiceStopOutcome = 0; // 1 = spoken stop; 2 = recognizer unexpectedly failed
         try
         {
@@ -160,6 +161,7 @@ public partial class MainWindow
             if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; }
             UpdateAssistantBadge();
             cts.Dispose();
+            RestoreAssistantAfterScreenCapture(restoreAssistant);
         }
     }
 }

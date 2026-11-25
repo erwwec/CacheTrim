@@ -65,7 +65,7 @@ public partial class MainWindow : Window
     private double _velocityX;
     private double _velocityY;
     private double _phase;
-    private double _uiScale = 0.6;
+    private double _uiScale = 0.5;
     private Point _dragOffset;
     private Point _lastPointer;
     private DateTime _lastPointerAt;
@@ -111,14 +111,14 @@ public partial class MainWindow : Window
         }
         InitializeComponent();
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
-        AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
+        AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
+        _uiScale = PetPolicy.NearestSize(_uiScale);
         PetCanvas.LayoutTransform = new ScaleTransform(_uiScale, _uiScale);
         Width = 260 * _uiScale;
         Height = 320 * _uiScale;
-        SizeLabel.Text = $"Размер: {_uiScale:P0}";
         ChatterSlider.Value = _chatterLevel;
         JumpSlider.Value = _jumpRate;
-        SizeSlider.Value = _uiScale;
+        SizeSelector.SelectedIndex = _uiScale == 0.5 ? 0 : _uiScale == 1.0 ? 1 : 2;
         OpacitySlider.Value = _petOpacity;
         PetCanvas.Opacity = _petOpacity;
         OpacityLabel.Text = $"Непрозрачность: {_petOpacity:P0}";
@@ -140,11 +140,11 @@ public partial class MainWindow : Window
         PhraseTextBox.Text = string.Join(Environment.NewLine, _customPhrases);
         Left = SystemParameters.WorkArea.Right - ModelRight * _uiScale - 28;
         Top = SystemParameters.WorkArea.Bottom - ModelBottom * _uiScale;
-        if (double.IsFinite(_savedLeft) && double.IsFinite(_savedTop)) {
-            var area = SystemParameters.WorkArea;
-            Left = Math.Clamp(_savedLeft, area.Left - ModelLeft * _uiScale, Math.Max(area.Left - ModelLeft * _uiScale, area.Right - ModelRight * _uiScale));
-            Top = Math.Clamp(_savedTop, area.Top - ModelTop * _uiScale, Math.Max(area.Top - ModelTop * _uiScale, area.Bottom - ModelBottom * _uiScale));
-        }
+        if (double.IsFinite(_savedLeft) && double.IsFinite(_savedTop)) { Left = _savedLeft; Top = _savedTop; }
+        // Monitor geometry is available only after the HWND is created.
+        Loaded += (_, _) => ConstrainToCurrentMonitor();
+        ((Panel)AssistantContent.Parent).Children.Remove(AssistantContent);
+        AssistantContent.Visibility = Visibility.Visible;
         _initializing = false;
         if (modelOverridden) SaveSettings();
         _nextIdlePollAt = DateTime.UtcNow;
@@ -169,7 +169,7 @@ public partial class MainWindow : Window
     {
         if (_dragging || SettingsPopup.IsOpen) return;
         var dt = _motionTimer.Interval.TotalSeconds;
-        var area = SystemParameters.WorkArea;
+        var area = GetCurrentMonitorWorkArea();
         var footOffset = ModelBottom * _uiScale;
         var visualLeft = ModelLeft * _uiScale;
         var visualRight = ModelRight * _uiScale;
@@ -239,6 +239,13 @@ public partial class MainWindow : Window
             if (_microAction == 4) StartMiniScene(ChooseMiniScene());
         }
 
+        // A drag or monitor change can put the feet below a higher taskbar/work area.
+        if (PetPolicy.FeetBelowWorkArea(Top, footOffset, area.Bottom))
+        {
+            Top = area.Bottom - footOffset;
+            if (_velocityY > 0) _velocityY = 0;
+            _onSurface = true;
+        }
         var previousTop = Top;
         var previousBottom = previousTop + footOffset;
         _velocityY += 1450 * dt;
@@ -436,8 +443,8 @@ public partial class MainWindow : Window
     {
         if (_initializing || ModelSelector.SelectedIndex < 0) return;
         _experimentalModel = ModelSelector.SelectedIndex == 1;
-        if (!_experimentalModel) { DisableWakeWord(); StopVoice(); StopCloud(); _conversation.Clear(); AssistantContext.IsChecked = false; }
-        AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
+        if (!_experimentalModel) { _assistantWindow?.Hide(); DisableWakeWord(); StopVoice(); StopCloud(); _conversation.Clear(); AssistantContext.IsChecked = false; }
+        AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         PetSprite.Source = SpriteFor(_activity, _miniSceneActive);
         SaveSettings();
     }
@@ -445,7 +452,6 @@ public partial class MainWindow : Window
     private void RefreshPlatforms()
     {
         var rects = new List<Rect>();
-        var dpi = VisualTreeHelper.GetDpi(this);
         EnumWindows((handle, _) =>
         {
             if (!IsWindowVisible(handle) || IsIconic(handle)) return true;
@@ -453,10 +459,13 @@ public partial class MainWindow : Window
             if (processId == (uint)Environment.ProcessId || GetWindowTextLength(handle) == 0) return true;
             if (GetWindowRect(handle, out var bounds))
             {
-                var width = (bounds.Right - bounds.Left) / dpi.DpiScaleX;
-                var height = (bounds.Bottom - bounds.Top) / dpi.DpiScaleY;
+                // Convert through this HWND so screen pixels and WPF coordinates use the same DPI.
+                Point a, b;
+                try { a = PointFromScreen(new Point(bounds.Left, bounds.Top)); b = PointFromScreen(new Point(bounds.Right, bounds.Bottom)); }
+                catch (InvalidOperationException) { return true; }
+                var width = b.X - a.X; var height = b.Y - a.Y;
                 if (width >= 120 && height >= 70)
-                    rects.Add(new Rect(bounds.Left / dpi.DpiScaleX, bounds.Top / dpi.DpiScaleY, width, height));
+                    rects.Add(new Rect(Left + a.X, Top + a.Y, width, height));
             }
             return true;
         }, IntPtr.Zero);
@@ -465,7 +474,7 @@ public partial class MainWindow : Window
         if (_onSurface)
         {
             var feet = Top + ModelBottom * _uiScale;
-            if (feet < SystemParameters.WorkArea.Bottom - 3)
+            if (feet < GetCurrentMonitorWorkArea().Bottom - 3)
             {
                 var left = Left + ModelLeft * _uiScale;
                 var right = Left + ModelRight * _uiScale;
@@ -696,15 +705,17 @@ public partial class MainWindow : Window
         var elapsed = (now - _lastPointerAt).TotalSeconds;
         if (elapsed > 0.002)
         {
-            var instantX = (pointer.X - _lastPointer.X) / elapsed;
-            var instantY = (pointer.Y - _lastPointer.Y) / elapsed;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var instantX = (pointer.X - _lastPointer.X) / dpi.DpiScaleX / elapsed;
+            var instantY = (pointer.Y - _lastPointer.Y) / dpi.DpiScaleY / elapsed;
             _velocityX = Math.Clamp(_velocityX * 0.35 + instantX * 0.65, -1800, 1800);
             _velocityY = Math.Clamp(_velocityY * 0.35 + instantY * 0.65, -1800, 1800);
             _lastPointer = pointer;
             _lastPointerAt = now;
         }
-        Left = pointer.X - _dragOffset.X;
-        Top = pointer.Y - _dragOffset.Y;
+        var localPointer = PointFromScreen(pointer);
+        Left += localPointer.X - _dragOffset.X;
+        Top += localPointer.Y - _dragOffset.Y;
         e.Handled = true;
     }
 
@@ -732,13 +743,9 @@ public partial class MainWindow : Window
 
     private void OpenSettingsPopup()
     {
-        var area = SystemParameters.WorkArea;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        Point targetTop;
-        try { targetTop = PetSprite.PointToScreen(new Point(0, 0)); }
-        catch { targetTop = PointToScreen(new Point(0, 0)); }
-        var topDip = targetTop.Y / dpi.DpiScaleY;
-        var bottomDip = topDip + PetSprite.ActualHeight * _uiScale;
+        var area = GetCurrentMonitorWorkArea();
+        var topDip = Top + ModelTop * _uiScale;
+        var bottomDip = Top + ModelBottom * _uiScale;
         var spaceAbove = Math.Max(0, topDip - area.Top - 8);
         var spaceBelow = Math.Max(0, area.Bottom - bottomDip - 8);
         var useAbove = spaceAbove >= spaceBelow;
@@ -1023,21 +1030,19 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    private void SizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void SizeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_initializing) return;
-        if (!IsInitialized || PetCanvas is null) return;
-        var newScale = e.NewValue;
-        var oldScale = _uiScale;
-        var footPosition = Top + ModelBottom * oldScale;
-        var modelCenterX = Left + (ModelLeft + ModelRight) / 2 * oldScale;
+        if (_initializing || !IsInitialized || PetCanvas is null || SizeSelector.SelectedIndex < 0) return;
+        var newScale = SizeSelector.SelectedIndex switch { 0 => 0.5, 1 => 1.0, _ => 1.5 };
+        var footPosition = Top + ModelBottom * _uiScale;
+        var modelCenterX = Left + (ModelLeft + ModelRight) / 2 * _uiScale;
         _uiScale = newScale;
         PetCanvas.LayoutTransform = new ScaleTransform(newScale, newScale);
         Width = 260 * newScale;
         Height = 320 * newScale;
         Top = footPosition - ModelBottom * newScale;
         Left = modelCenterX - (ModelLeft + ModelRight) / 2 * newScale;
-        SizeLabel.Text = $"Размер: {newScale:P0}";
+        ConstrainToCurrentMonitor();
         SaveSettings();
     }
 
@@ -1143,6 +1148,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isClosing = true;
+        _assistantWindow?.Close();
         DisableWakeWord();
         StopVoice();
         StopCloud();

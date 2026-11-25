@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
   pull_request:
     branches: [main]
 
@@ -23,6 +23,10 @@ jobs:
           dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
           if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
           .\tests\SmokePet.ps1
+
+      - name: Check separate assistant window and sizes
+        shell: pwsh
+        run: .\tests\SmokePetAssistant.ps1
 
       - name: Publish Windows executable
         shell: pwsh
