@@ -39,6 +39,9 @@ public partial class MainWindow : Window
         set
         {
             _isBusy = value;
+            BusyProgressBar.IsIndeterminate = true;
+            BusyProgressBar.Value = 0;
+            BusyProgressDetail.Visibility = Visibility.Collapsed;
             BusyBanner.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         }
     }
@@ -100,7 +103,7 @@ public partial class MainWindow : Window
         RefreshMemory();
     }
 
-    private void OnWindowStateChanged(object? sender, EventArgs e) => MaximizeButton.Content = WindowState == WindowState.Maximized || _coversTaskbar ? "❐" : "□";
+    private void OnWindowStateChanged(object? sender, EventArgs e) => MaximizeButton.Content = WindowState == WindowState.Maximized || _coversTaskbar ? "\uE923" : "\uE922";
     private void OnMinimizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void OnMaximizeClick(object sender, RoutedEventArgs e)
     {
@@ -108,7 +111,7 @@ public partial class MainWindow : Window
         {
             WindowState = WindowState.Normal;
             _coversTaskbar = false;
-            MaximizeButton.Content = "□";
+            MaximizeButton.Content = "\uE922";
             return;
         }
         if (_coversTaskbar)
@@ -118,7 +121,7 @@ public partial class MainWindow : Window
             Top = _windowRestoreBounds.Top;
             Width = _windowRestoreBounds.Width;
             Height = _windowRestoreBounds.Height;
-            MaximizeButton.Content = "□";
+            MaximizeButton.Content = "\uE922";
             return;
         }
 
@@ -132,7 +135,7 @@ public partial class MainWindow : Window
         Width = size.X;
         Height = size.Y;
         _coversTaskbar = true;
-        MaximizeButton.Content = "❐";
+        MaximizeButton.Content = "\uE923";
     }
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
@@ -435,7 +438,18 @@ public partial class MainWindow : Window
         bool transparency = IsWindowsTransparencyEnabled();
         bool supported = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621);
         bool requested = Theme.IsGlass && _settings.GlassBackgroundBlur > 0;
-        bool tryAcrylic = requested && transparency && supported && source?.CompositionTarget != null;
+        bool highContrast = SystemParameters.HighContrast;
+        bool tryAcrylic = requested && transparency && supported && !highContrast && source?.CompositionTarget != null;
+        // WindowChrome owns the DWM frame. A zero frame overrides a direct DWM extension;
+        // the full glass frame is required for a backdrop across the WPF client area.
+        var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
+        if (chrome?.IsFrozen == true)
+        {
+            chrome = (System.Windows.Shell.WindowChrome)chrome.Clone();
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this, chrome);
+        }
+        if (chrome != null)
+            chrome.GlassFrameThickness = tryAcrylic ? System.Windows.Shell.WindowChrome.GlassFrameCompleteThickness : new Thickness(0);
         bool acrylicApplied = false;
         int result = 0;
 
@@ -459,6 +473,7 @@ public partial class MainWindow : Window
                 int none = 1; // DWMSBT_NONE
                 _ = DwmSetWindowAttribute(hwnd, 38, ref none, sizeof(int));
             }
+            if (chrome != null) chrome.GlassFrameThickness = new Thickness(0);
             GlassMargins noGlass = new();
             _ = DwmExtendFrameIntoClientArea(hwnd, ref noGlass);
             if (source?.CompositionTarget != null)
@@ -486,8 +501,9 @@ public partial class MainWindow : Window
             if (!requested) SetStatus("Размытие фона выключено");
             else if (!transparency) SetStatus("Включите эффекты прозрачности в Windows · сплошной фон");
             else if (!supported) SetStatus("Acrylic требует Windows 11 22H2 или новее · сплошной фон");
+            else if (highContrast) SetStatus("Контрастная тема Windows: используется сплошной фон");
             else if (!acrylicApplied) SetStatus("Не удалось включить Acrylic · сплошной фон");
-            else SetStatus("Acrylic Windows включён");
+            else SetStatus("Acrylic запрошен; видимость зависит от настроек Windows");
         }
     }
 
