@@ -24,14 +24,18 @@ internal static class Program
             var selector = (System.Windows.Controls.ComboBox)Element("ModelSelector");
             var sprite = (System.Windows.Controls.Image)Element("PetSprite");
             selector.SelectedIndex = 0;
+            Check(Element("AssistantSection").Visibility == Visibility.Collapsed, "assistant hidden in original model");
+            Check(type.GetField("_voiceSession", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "microphone not started automatically");
             var classic = sprite.Source;
             selector.SelectedIndex = 1;
+            Check(Element("AssistantSection").Visibility == Visibility.Visible, "assistant visible in V2");
             Check(sprite.Source != null && !ReferenceEquals(sprite.Source, classic), "test model is distinct from the original");
             Check(File.ReadAllLines(Path.Combine(tempDir, "settings.ini"))[17] == "True", "test model selection is saved");
             type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(pet, false);
             type.GetMethod("LoadSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
             Check((bool)type.GetField("_experimentalModel", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)!, "test model selection is restored");
             selector.SelectedIndex = 0;
+            Check(Element("AssistantSection").Visibility == Visibility.Collapsed && type.GetField("_voiceSession", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet) == null, "switching to original stops voice and hides assistant");
             Check(ReferenceEquals(sprite.Source, classic), "original model can be restored without replacement");
             var sections = new[] { "AppearanceSection", "RemindersSection", "CommandsSection", "BehaviorSection", "MusicSection" };
             Check(sections.All(name => Element(name) is System.Windows.Controls.Expander), "all pet menu groups exist");

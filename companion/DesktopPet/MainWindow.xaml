@@ -86,7 +86,7 @@
                         <StackPanel>
                             <TextBlock Text="Модель Клода" Foreground="#FFF7F1FC" Margin="0,4,0,3" />
                             <ComboBox x:Name="ModelSelector" MinHeight="30" Margin="0,0,0,8" SelectionChanged="ModelSelector_SelectionChanged">
-                                <ComboBoxItem Content="Обычный Клод" /><ComboBoxItem Content="Новый Клод · тест" />
+                                <ComboBoxItem Content="Обычный Клод" /><ComboBoxItem Content="Клод V2" />
                             </ComboBox>
                             <TextBlock x:Name="SizeLabel" Text="Размер: 100%" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
                             <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="2" Value="0.6" HorizontalAlignment="Stretch" ValueChanged="SizeSlider_ValueChanged" Margin="0,0,0,6" />
@@ -114,6 +114,16 @@
                             <Button Content="Открыть папку загрузок" Click="OpenDownloads_Click" />
                             <Button Content="Прыгнуть" Click="Jump_Click" />
                             <Button x:Name="BringSecretButton" Content="Принеси секрет" Click="BringSecret_Click" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="AssistantSection" Header="Помощник · Клод V2" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Простые команды, не ИИ-чат. Микрофон включается только по кнопке на одну команду." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,6" />
+                            <Button x:Name="AssistantListenButton" Content="Слушать одну команду" Click="AssistantListen_Click" />
+                            <TextBlock x:Name="AssistantVoiceStatus" Text="Микрофон выключен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,5" />
+                            <TextBox x:Name="AssistantCommandText" MaxLength="80" Margin="0,2,0,4" ToolTip="Введи команду из списка ниже" />
+                            <Button Content="Выполнить текстовую команду" Click="AssistantText_Click" />
+                            <TextBlock Text="Команды: привет Клод; который час; сколько времени; какое сегодня число; прыгни; принеси секрет; открой загрузки; покажи рабочий стол." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,5,0,2" />
                         </StackPanel>
                     </Expander>
                     <Expander x:Name="BehaviorSection" Header="Поведение и секреты">
