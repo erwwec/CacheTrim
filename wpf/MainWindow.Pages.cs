@@ -142,6 +142,12 @@ public partial class MainWindow
         await RunBusyAsync("проверяется аниме-аватар…", async () =>
         {
             string path = await Task.Run(AnimeAvatarPackage.EnsureExtracted);
+            if (IsKnownCompanionRunning(path))
+            {
+                MessageBox.Show(this, "Аниме-аватар уже запущен. Найди его на рабочем столе или используй кнопку перезапуска.", "Аниме-аватар", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            using FileStream verified = AnimeAvatarPackage.TryOpenVerified(path) ?? throw new InvalidOperationException("Файл аниме-аватара не прошёл проверку целостности. Запуск отменён.");
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(path)! });
             App.Log("Запрошен запуск аниме-аватара из обновления");
         });
@@ -173,6 +179,31 @@ public partial class MainWindow
         else await LaunchDesktopPetAsync();
     }
 
+    internal static bool IsKnownCompanionRunning(string target)
+    {
+        string expected = System.IO.Path.GetFullPath(target);
+        var processes = System.Diagnostics.Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(expected));
+        try
+        {
+            foreach (var process in processes)
+            {
+                try
+                {
+                    if (process.HasExited) continue;
+                    string actual = process.MainModule?.FileName ?? throw new InvalidOperationException("Не удалось определить файл работающего компаньона.");
+                    if (string.Equals(System.IO.Path.GetFullPath(actual), expected, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+                catch (System.ComponentModel.Win32Exception ex)
+                {
+                    throw new InvalidOperationException("Не удалось безопасно проверить работающего компаньона. Проверь запущенные программы и попробуй снова.", ex);
+                }
+                catch (InvalidOperationException) when (process.HasExited) { }
+            }
+            return false;
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
+    }
+
     internal static void CloseKnownCompanion(string target)
     {
         string expected = System.IO.Path.GetFullPath(target);
@@ -201,14 +232,13 @@ public partial class MainWindow
 
     private async Task LaunchDesktopPetAsync()
     {
-        if (System.Diagnostics.Process.GetProcessesByName("DesktopPet").Length > 0)
-        {
-            MessageBox.Show(this, "Питомец уже запущен. Найди его на рабочем столе или нажми по нему правой кнопкой, чтобы открыть настройки.", "Desktop Pet", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
         await RunBusyAsync("Проверяем файл Клода…", async () =>
         {
+            if (IsKnownCompanionRunning(PetCache.PathToPet))
+            {
+                MessageBox.Show(this, "Питомец уже запущен. Найди его на рабочем столе или нажми по нему правой кнопкой, чтобы открыть настройки.", "Desktop Pet", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             string expected = typeof(MainWindow).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
                 .Cast<System.Reflection.AssemblyMetadataAttribute>()
                 .FirstOrDefault(a => a.Key == "TrustedDesktopPetSha256")?.Value ?? string.Empty;
