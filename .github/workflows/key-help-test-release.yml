@@ -1,0 +1,89 @@
+name: Publish v2.1.17.4 test once
+
+on:
+  push:
+    branches:
+      - 'release/v2.1.17.4-test-run'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.head_commit.message == 'Release v2.1.17.4-test'
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: cd6710110244e1d3fe6b24c1d91c8b9f0934a1b4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish Desktop Pet companion
+        shell: powershell
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw "Desktop Pet publish failed: $LASTEXITCODE" }
+          Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
+
+
+      - name: Package standalone pet with offline voice model
+        shell: powershell
+        run: |
+          $dir = '.\dist\voice-pack'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item .\dist\pet-publish\DesktopPet.exe $dir -Force
+          Copy-Item .\dist\pet-publish\VoiceModel $dir -Recurse -Force
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $native = Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64'
+          foreach ($name in @('libvosk.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.dll')) {
+            $file = Join-Path $native $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing Vosk dependency: $name" }
+            Copy-Item -LiteralPath $file -Destination $dir -Force
+          }
+          Compress-Archive -Path "$dir\*" -DestinationPath .\dist\DesktopPet-voice-pack.zip -Force
+          $voiceHash = (Get-FileHash .\dist\DesktopPet-voice-pack.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path .\dist\DesktopPet-voice-pack.zip.sha256 -Value $voiceHash -NoNewline -Encoding ASCII
+
+      - name: Publish self-contained WPF app
+        shell: powershell
+        run: |
+          $petHash = (Get-FileHash .\dist\pet-publish\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:TrustedDesktopPetSha256=$petHash" -o .\dist\publish
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
+          Copy-Item .\dist\publish\CacheTrim.exe .\dist\CacheTrim.exe -Force
+
+
+      - name: Verify embedded pet integrity pin
+        shell: powershell
+        run: |
+          $petHash = (Get-FileHash .\dist\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $assembly = '.\wpf\obj\x64\Release\net10.0-windows10.0.19041.0\win-x64\CacheTrim.dll'
+          dotnet run --project .\tests\BuildPinTests\BuildPinTests.csproj -c Release -- $assembly $petHash
+          if ($LASTEXITCODE -ne 0) { throw 'App does not pin the released Desktop Pet' }
+      - name: Create SHA-256 checksum
+        shell: powershell
+        run: |
+          $hash = (Get-FileHash .\dist\CacheTrim.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path .\dist\CacheTrim.exe.sha256 -Value $hash -NoNewline -Encoding ASCII
+          $petHash = (Get-FileHash .\dist\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path .\dist\DesktopPet.exe.sha256 -Value $petHash -NoNewline -Encoding ASCII
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.17.4-test
+          target_commitish: cd6710110244e1d3fe6b24c1d91c8b9f0934a1b4
+          body_path: RELEASE_NOTES.md
+          prerelease: true
+          files: |
+            dist/CacheTrim.exe
+            dist/CacheTrim.exe.sha256
+            dist/DesktopPet.exe
+            dist/DesktopPet.exe.sha256
+            dist/DesktopPet-voice-pack.zip
+            dist/DesktopPet-voice-pack.zip.sha256
