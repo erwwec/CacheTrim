@@ -244,8 +244,16 @@ public partial class MainWindow
                 .Cast<System.Reflection.AssemblyMetadataAttribute>()
                 .FirstOrDefault(a => a.Key == "TrustedDesktopPetSha256")?.Value ?? string.Empty;
             if (!PetCache.IsHash(expected)) throw new InvalidOperationException("В приложении отсутствует контрольная сумма питомца. Запуск отменён.");
+            if (experimental == true && PetCache.IsPreviousReleaseHash(expected))
+                throw new InvalidOperationException("Эта сборка доверяет старому питомцу без Клода V2. Собери согласованные CacheTrim и DesktopPet с помощью build.ps1.");
             string path = PetCache.PathToPet;
             System.IO.FileStream verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
+            if (verified == null)
+            {
+                string bundled = System.IO.Path.Combine(AppContext.BaseDirectory, "DesktopPet.exe");
+                if (await Task.Run(() => PetCache.TryInstallBundled(bundled, path, expected)))
+                    verified = await Task.Run(() => PetCache.TryOpenVerified(path, expected));
+            }
             if (verified == null)
             {
                 // Previous releases do not contain the experimental model.

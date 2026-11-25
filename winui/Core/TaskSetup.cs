@@ -107,7 +107,7 @@ namespace CacheTrim
         }
 
         private static string BuildXml(string exePath, int delaySeconds) => BuildXmlForUser(exePath, delaySeconds, WindowsIdentity.GetCurrent().Name);
-        private static string BuildXmlForUser(string exePath, int delaySeconds, string user)
+        internal static string BuildXmlForUser(string exePath, int delaySeconds, string user)
         {
             string delay = "PT" + Math.Max(0, delaySeconds) + "S";
 
@@ -148,7 +148,8 @@ namespace CacheTrim
             sb.AppendLine("    <Hidden>true</Hidden>");
             sb.AppendLine("    <RunOnlyIfIdle>false</RunOnlyIfIdle>");
             sb.AppendLine("    <WakeToRun>false</WakeToRun>");
-            sb.AppendLine("    <ExecutionTimeLimit>PT10M</ExecutionTimeLimit>");
+            // Do not terminate cleanup while Windows Update services are stopped.
+            sb.AppendLine("    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>");
             sb.AppendLine("    <Priority>7</Priority>");
             sb.AppendLine("  </Settings>");
             sb.AppendLine("  <Actions Context=\"Author\">");

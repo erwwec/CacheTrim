@@ -436,7 +436,7 @@ public partial class MainWindow : Window
     {
         if (_initializing || ModelSelector.SelectedIndex < 0) return;
         _experimentalModel = ModelSelector.SelectedIndex == 1;
-        if (!_experimentalModel) { StopVoice(); StopCloud(); }
+        if (!_experimentalModel) { DisableWakeWord(); StopVoice(); StopCloud(); _conversation.Clear(); AssistantContext.IsChecked = false; }
         AssistantSection.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         PetSprite.Source = SpriteFor(_activity, _miniSceneActive);
         SaveSettings();
@@ -1143,6 +1143,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isClosing = true;
+        DisableWakeWord();
         StopVoice();
         StopCloud();
         _reminderTimer.Stop(); _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();

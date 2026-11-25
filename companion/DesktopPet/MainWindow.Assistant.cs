@@ -18,10 +18,11 @@ public partial class MainWindow
     private void AssistantListen_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
+        if (_wakeEnabled) { AssistantVoiceStatus.Text = "Сначала выключи вызов «Джарвис»."; return; }
         if (_voiceSession != null) { StopVoice(); return; }
         if (_cloudCancellation != null) { AssistantVoiceStatus.Text = "Сначала останови облачный запрос."; return; }
         if (MessageBox.Show(this,
-            "Включить микрофон для одной команды? Постоянного прослушивания нет. CacheTrim не сохраняет и не отправляет запись; обработка зависит от установленного модуля Windows.",
+            "Включить микрофон для одной команды? Постоянного прослушивания нет. Запись не сохраняется и не отправляется в облако; фраза распознаётся локальной моделью Vosk.",
             "Голосовые команды Клода V2", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         VoiceCommandSession? session = null;
         try
@@ -49,8 +50,8 @@ public partial class MainWindow
         catch (Exception ex)
         {
             StopVoice();
-            AssistantVoiceStatus.Text = ex is InvalidOperationException && ex.Message.Contains("SAPI")
-                ? ex.Message : "Не удалось включить распознавание. Проверь микрофон, разрешения и русский модуль SAPI Windows; можно вводить команды текстом.";
+            AssistantVoiceStatus.Text = ex is InvalidOperationException
+                ? ex.Message : "Не удалось включить распознавание. Проверь микрофон, разрешения и папку VoiceModel рядом с приложением; можно вводить команды текстом.";
         }
     }
 

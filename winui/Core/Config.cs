@@ -48,6 +48,7 @@ namespace CacheTrim
         public int HotkeyOpen;
         public int HotkeyPet;
         public int HotkeyAnime;
+        private bool _cleanupLoadValid = true;
 
         public Config Clone()
         {
@@ -74,16 +75,82 @@ namespace CacheTrim
             get { return Path.Combine(LogDir, "history.log"); }
         }
 
-        public static Config Load()
+        private static readonly string[] CleanupFlags =
+        {
+            "working_sets", "standby", "low_standby", "modified", "file_cache",
+            "temp", "browsers", "wer", "update_cache", "d3d_cache", "thumbnails",
+            "dumps", "windows_logs", "uwp_cache", "recycle", "prefetch", "dns", "arp", "netbios"
+        };
+
+        // Never silently substitute cleanup defaults for a damaged saved configuration.
+        internal static void EnsureCleanupSettingsReadable(bool requireExisting = false) =>
+            ValidateCleanupSettingsFile(ConfigPath, requireExisting);
+
+        internal static void ValidateCleanupSettingsFile(string path, bool requireExisting)
+        {
+            try
+            {
+                string[] lines;
+                try { lines = File.ReadAllLines(path); }
+                catch (FileNotFoundException) { if (!requireExisting) return; throw; }
+                catch (DirectoryNotFoundException) { if (!requireExisting) return; throw; }
+                ValidateCleanupLines(lines);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                throw new InvalidDataException("Настройки очистки недоступны или повреждены. Очистка остановлена. Сохрани копию и восстанови файл " + path + ": " + ex.Message, ex);
+            }
+        }
+
+        private static void ValidateCleanupLines(string[] lines)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";")) continue;
+                int eq = line.IndexOf('=');
+                if (eq <= 0) throw new InvalidDataException("Строка настроек имеет неверный формат.");
+                string key = line.Substring(0, eq).Trim();
+                if (!map.TryAdd(key, line.Substring(eq + 1).Trim()))
+                    throw new InvalidDataException("Параметр повторяется: " + key);
+            }
+            foreach (string key in CleanupFlags)
+            {
+                if (!map.TryGetValue(key, out string value) ||
+                    !(value == "0" || value == "1" ||
+                      value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                      value.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+                      value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                      value.Equals("no", StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidDataException("Отсутствует или повреждён параметр " + key + ".");
+            }
+            if (!map.TryGetValue("temp_age_hours", out string age) ||
+                !int.TryParse(age, NumberStyles.Integer, CultureInfo.InvariantCulture, out int hours) ||
+                hours < 0 || hours > 87600)
+                throw new InvalidDataException("Возраст временных файлов отсутствует или указан неверно.");
+        }
+
+        internal void EnsureCleanupSnapshotReadable()
+        {
+            if (!_cleanupLoadValid)
+                throw new InvalidDataException("Настройки были повреждены при запуске. Восстанови " + ConfigPath + " и перезапусти CacheTrim.");
+        }
+
+        public static Config Load(bool requireValidExisting = false) => LoadFromPath(ConfigPath, requireValidExisting);
+
+        internal static Config LoadFromPath(string path, bool requireValidExisting = false)
         {
             Config c = new Config();
             try
             {
-                if (!File.Exists(ConfigPath))
-                    return c;
-
                 Dictionary<string, string> map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string raw in File.ReadAllLines(ConfigPath))
+                string[] lines;
+                try { lines = File.ReadAllLines(path); }
+                catch (FileNotFoundException) when (!requireValidExisting) { return c; }
+                catch (DirectoryNotFoundException) when (!requireValidExisting) { return c; }
+                ValidateCleanupLines(lines);
+                foreach (string raw in lines)
                 {
                     string line = raw.Trim();
                     if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";"))
@@ -132,9 +199,11 @@ namespace CacheTrim
                 c.HotkeyAnime = Math.Clamp(Number(map, "hotkey_anime", 0), 0, 6);
                 c.UiDensity = Math.Max(0, Math.Min(2, Number(map, "ui_density", c.UiDensity)));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // A broken config never stops a clean; defaults are the safe path.
+                if (requireValidExisting)
+                    throw new InvalidDataException("Не удалось безопасно загрузить настройки очистки из " + path + ": " + ex.Message, ex);
+                c._cleanupLoadValid = false;
             }
             return c;
         }
@@ -144,6 +213,8 @@ namespace CacheTrim
             string temporaryPath = ConfigPath + ".tmp";
             try
             {
+                EnsureCleanupSnapshotReadable();
+                EnsureCleanupSettingsReadable();
                 Directory.CreateDirectory(ConfigDir);
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("# CacheTrim settings");

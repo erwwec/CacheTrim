@@ -28,6 +28,24 @@ jobs:
           Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
 
 
+      - name: Package standalone pet with offline voice model
+        shell: powershell
+        run: |
+          $dir = '.\dist\voice-pack'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item .\dist\pet-publish\DesktopPet.exe $dir -Force
+          Copy-Item .\dist\pet-publish\VoiceModel $dir -Recurse -Force
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $native = Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64'
+          foreach ($name in @('libvosk.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.dll')) {
+            $file = Join-Path $native $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing Vosk dependency: $name" }
+            Copy-Item -LiteralPath $file -Destination $dir -Force
+          }
+          Compress-Archive -Path "$dir\*" -DestinationPath .\dist\DesktopPet-voice-pack.zip -Force
+          $voiceHash = (Get-FileHash .\dist\DesktopPet-voice-pack.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path .\dist\DesktopPet-voice-pack.zip.sha256 -Value $voiceHash -NoNewline -Encoding ASCII
+
       - name: Publish self-contained WPF app
         shell: powershell
         run: |
@@ -56,8 +74,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: RELEASE_NOTES.md
+          prerelease: ${{ contains(github.ref_name, '-test') }}
           files: |
             dist/CacheTrim.exe
             dist/CacheTrim.exe.sha256
             dist/DesktopPet.exe
             dist/DesktopPet.exe.sha256
+            dist/DesktopPet-voice-pack.zip
+            dist/DesktopPet-voice-pack.zip.sha256

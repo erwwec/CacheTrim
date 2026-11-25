@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
+    branches: [main, 'test/claude-v2-voice', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
   pull_request:
     branches: [main]
 
@@ -79,6 +79,11 @@ jobs:
         run: |
           dotnet run --project .\tests\FileReviewTests\FileReviewTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'File review tests failed' }
+      - name: Test cleanup configuration safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\ConfigSafetyTests\ConfigSafetyTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cleanup configuration safety tests failed' }
       - name: Test cleanup schedule definition
         shell: pwsh
         run: |
@@ -104,6 +109,13 @@ jobs:
         run: |
           dotnet run --project .\tests\CloudAssistantTests\CloudAssistantTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Cloud assistant safeguards failed' }
+      - name: Test bundled Russian voice model
+        shell: pwsh
+        run: |
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $env:PATH = (Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64') + ';' + $env:PATH
+          dotnet run --project .\tests\OfflineSpeechTests\OfflineSpeechTests.csproj -c Release -- .\dist\pet-publish\VoiceModel\vosk-model-small-ru-0.22
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled speech model test failed' }
       - name: Test V2 assistant command allowlist
         shell: pwsh
         run: |

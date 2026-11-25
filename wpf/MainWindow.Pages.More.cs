@@ -355,6 +355,11 @@ public partial class MainWindow
 
     private async Task SetScheduledCleanAsync(bool enabled)
     {
+        if (enabled)
+        {
+            try { _settings.EnsureCleanupSnapshotReadable(); Config.EnsureCleanupSettingsReadable(true); CleanupOptions.Load(); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message + "\n\nПеред включением сохрани настройки очистки.", "Автоочистка", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        }
         string exe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
         await RunBusyAsync(enabled ? "включается автоочистка…" : "снимается задача автоочистки…", async () =>
         {

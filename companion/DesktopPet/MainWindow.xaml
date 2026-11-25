@@ -132,14 +132,25 @@
                             <PasswordBox x:Name="AssistantApiKey" MaxLength="256" ToolTip="Ключ Groq" Margin="0,2,0,4" />
                             <Button Content="Сохранить ключ Groq" Click="SaveCloudKey_Click" />
                             <Button Content="Удалить сохранённый ключ" Click="DeleteCloudKey_Click" />
+                            <CheckBox x:Name="AssistantContext" Content="Помнить последние реплики в этом запуске" Foreground="#FFF7F1FC" Margin="0,8,0,3" Checked="AssistantContext_Changed" Unchecked="AssistantContext_Changed" />
+                            <TextBlock Text="По желанию: до четырёх последних пар реплик хранятся только в памяти и повторно отправляются в Groq при следующих текстовых и голосовых запросах. Снимки экрана не сохраняются в диалоге." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <Button Content="Очистить историю диалога" Click="ClearAssistantContext_Click" />
                             <TextBox x:Name="AssistantCloudText" MaxLength="1000" Height="56" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Напиши задачу" Margin="0,6,0,4" />
-                            <TextBlock Text="Голос: запись до 15 секунд отправляется в Groq для распознавания. Постоянного прослушивания нет." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <TextBlock Text="Голос: запись до 15 секунд отправляется в Groq. Постоянный вызов «Джарвис» включается отдельно ниже." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                             <Button x:Name="AssistantCloudVoiceButton" Content="Сказать задачу ИИ" Click="CloudVoice_Click" />
                             <Button x:Name="AssistantCloudButton" Content="Спросить ИИ" Click="AskCloud_Click" />
                             <Button x:Name="AssistantScreenButton" Content="Спросить ИИ об экране" Click="AskScreen_Click" />
-                            <TextBlock Text="По этой кнопке снимок основного экрана, включая открытые личные данные, отправляется в Groq. Сейчас это только просмотр — управление мышью и клавиатурой не готово." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,5" />
+                            <CheckBox x:Name="AssistantAutoControl" IsChecked="True" Content="Автоматически выполнять шаги" Foreground="#FFF7F1FC" Margin="0,8,0,3" />
+                            <CheckBox x:Name="AssistantVoiceStop" IsChecked="True" Content="Слушать «стоп» во время задачи" Foreground="#FFF7F1FC" Margin="0,4,0,3" />
+                            <TextBlock Text="Во время задачи микрофон слушает только команды остановки через локальную русскую модель Vosk из папки сборки. Если модель недоступна, задача не запустится; можно выключить голосовую остановку и пользоваться кнопкой. Точность не гарантирована." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <Button Content="Выполнить задачу на ПК (эксперимент)" Click="ComputerControl_Click" />
+                            <Button Content="Сказать задачу для ПК (эксперимент)" Click="ComputerControlVoice_Click" />
+                            <Button x:Name="WakeWordButton" Content="Включить вызов «Джарвис»" Click="WakeWord_Click" />
+                            <TextBlock Text="Микрофон постоянно слушает слово «Джарвис» до выключения. После срабатывания последующая запись до 15 секунд отправляется в Groq. Возможны ложные срабатывания." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,4" />
+                            <TextBlock Text="Управление: снимок экрана отправляется в Groq на каждом шаге. В авторежиме действия выполняются без подтверждения; проверка опасных действий неполная. Можно остановить. Не используйте с паролями и платежами." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,5" />
+                            <TextBlock Text="По этой кнопке снимок основного экрана, включая открытые личные данные, отправляется в Groq. Эта кнопка только просматривает экран; управление запускается отдельно." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,5" />
                             <TextBlock x:Name="AssistantCloudStatus" Text="ИИ не запущен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,4" />
-                            <TextBlock Text="ИИ может открыть YouTube, Telegram Desktop и загрузки, создать текстовую презентацию, назвать время, прыгнуть или принести секрет. Просмотр экрана работает отдельно; управление мышью и выбор видео пока не готовы." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <TextBlock Text="ИИ может открыть поиск YouTube по запросу (запрос отправляется YouTube), Telegram Desktop и загрузки, создать текстовую презентацию, назвать время, прыгнуть или принести секрет. Управление экраном — эксперимент; проверяйте результат и следите за действиями." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                         </StackPanel>
                     </Expander>
                     <Expander x:Name="BehaviorSection" Header="Поведение и секреты">

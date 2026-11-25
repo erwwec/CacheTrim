@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.ServiceProcess;
 
 namespace CacheTrim
@@ -64,6 +65,8 @@ namespace CacheTrim
 
         public void Run(Config c)
         {
+            c.EnsureCleanupSnapshotReadable();
+            Config.EnsureCleanupSettingsReadable();
             if (!_preview) _gameGuard.Check(true);
             using FileStream runLock = _preview ? null : AcquireRunLock();
             DateTime? tempAge = c.TempAgeHours > 0
@@ -522,7 +525,6 @@ namespace CacheTrim
                 ["Opera"] = Path.Combine(roaming, @"Opera Software\Opera Stable")
             };
 
-            string[] profiles = { "Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Guest Profile" };
             string[] subdirs = { "Cache", @"Code Cache", "GPUCache", @"Service Worker\CacheStorage", "DawnCache", "GrShaderCache" };
 
             foreach (var browser in roots)
@@ -532,10 +534,10 @@ namespace CacheTrim
                 if (!Directory.Exists(root))
                     continue;
 
-                foreach (string profile in profiles)
+                foreach (string profile in BrowserProfiles(root))
                 {
                     foreach (string sub in subdirs)
-                        result.Add(Path.Combine(Path.Combine(root, profile), sub));
+                        result.Add(Path.Combine(profile, sub));
                 }
 
                 foreach (string sub in subdirs)
@@ -543,6 +545,32 @@ namespace CacheTrim
             }
 
             return result;
+        }
+
+        internal static IEnumerable<string> BrowserProfiles(string root)
+        {
+            // Only real, recognised profile directories; never traverse directory links.
+            string[] directories;
+            try { directories = Directory.GetDirectories(root); }
+            catch (IOException) { return Array.Empty<string>(); }
+            catch (UnauthorizedAccessException) { return Array.Empty<string>(); }
+            var profiles = new List<string>();
+            foreach (string directory in directories)
+            {
+                string name = Path.GetFileName(directory);
+                bool numbered = name.StartsWith("Profile ", StringComparison.OrdinalIgnoreCase) &&
+                    name.Length > 8 && name.Substring(8).All(c => c >= '0' && c <= '9');
+                if (!numbered && !name.Equals("Default", StringComparison.OrdinalIgnoreCase) &&
+                    !name.Equals("Guest Profile", StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0)
+                        profiles.Add(directory);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            return profiles;
         }
 
         // ---------------- external tools ----------------
@@ -593,6 +621,9 @@ namespace CacheTrim
             {
                 using (ServiceController sc = new ServiceController(name))
                 {
+                    if (sc.Status == ServiceControllerStatus.StopPending)
+                        sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                    sc.Refresh();
                     if (sc.Status == ServiceControllerStatus.Running)
                         return null;
                     if (sc.Status != ServiceControllerStatus.Stopped)

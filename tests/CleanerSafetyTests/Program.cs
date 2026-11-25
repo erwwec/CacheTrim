@@ -4,6 +4,8 @@ namespace CacheTrim {
     internal sealed class Config {
         public bool Temp, Wer, Browsers, D3dCache, Thumbs, Dumps, WinLogs, UwpCache, Prefetch, UpdateCache, Dns, Arp, Netbios, Recycle, WorkingSets, Modified, Standby, LowStandby, FileCache;
         public int TempAgeHours;
+        internal static void EnsureCleanupSettingsReadable(bool requireExisting = false) { }
+        internal void EnsureCleanupSnapshotReadable() { }
     }
     internal static class Native {
         public enum PurgeTarget { WorkingSets, ModifiedList, StandbyList, LowPriorityStandby }
@@ -77,6 +79,23 @@ internal static class Program {
             sweep.Invoke(cleaner, new object[] { Path.Combine(link, "Temp"), null, "*" });
             if (!File.Exists(protectedFile)) throw new Exception("file behind ancestor link was deleted");
             Console.WriteLine("OK: ancestor directory link is skipped");
+            string browserRoot = Path.Combine(baseDir, "browser");
+            Directory.CreateDirectory(Path.Combine(browserRoot, "Default"));
+            Directory.CreateDirectory(Path.Combine(browserRoot, "Profile 6"));
+            Directory.CreateDirectory(Path.Combine(browserRoot, "Profile 123"));
+            Directory.CreateDirectory(Path.Combine(browserRoot, "Profile bad"));
+            string profileLink = Path.Combine(browserRoot, "Profile 7");
+            if (OperatingSystem.IsWindows()) {
+                using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c mklink /J \"" + profileLink + "\" \"" + outside + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                proc!.WaitForExit();
+                if (proc.ExitCode != 0) throw new Exception("could not create profile junction");
+            } else Directory.CreateSymbolicLink(profileLink, outside);
+            var profiles = Cleaner.BrowserProfiles(browserRoot).Select(Path.GetFileName).ToArray();
+            if (!profiles.Contains("Default") || !profiles.Contains("Profile 6") ||
+                !profiles.Contains("Profile 123") || profiles.Contains("Profile bad") || profiles.Contains("Profile 7"))
+                throw new Exception("browser profiles incorrectly enumerated");
+            Console.WriteLine("OK: all numbered browser profiles discovered without unrelated folders");
+            Directory.Delete(profileLink, false);
         } finally {
             string link = Path.Combine(baseDir, "link");
             // Delete the junction itself, never recurse through it.

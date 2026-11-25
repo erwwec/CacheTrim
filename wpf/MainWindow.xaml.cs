@@ -45,12 +45,10 @@ public partial class MainWindow : Window
             BusyBanner.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
         }
     }
-    private bool _suppressColor;
     private bool _suppressTweakEvents;
     private bool _suppressAutostartEvents;
     private string _optimizationModule = "Windows";
     private StackPanel? _pageContent;
-    private System.Windows.Controls.Panel? _pageCards;
     private Canvas? _chart;
     private TextBlock? _memoryUsed;
     private TextBlock? _memoryStandby;
@@ -221,7 +219,6 @@ public partial class MainWindow : Window
             new TextBlock { Text = subtitle, FontSize = 12, Foreground = Brush(Theme.Muted), TextWrapping = TextWrapping.Wrap }
         }});
         _pageContent = stack;
-        _pageCards = null;
         _chart = null;
         _memoryUsed = _memoryStandby = _memoryCache = _memoryCommit = _memoryPercent = null;
         _logBox = null;

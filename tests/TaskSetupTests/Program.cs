@@ -10,6 +10,8 @@ Check(root.Descendants(ns + "DaysInterval").Single().Value == "1", "daily trigge
 Check(root.Descendants(ns + "LogonTrigger").Count() == 0, "no unintended logon trigger");
 Check(settings.Element(ns + "RunOnlyIfIdle")!.Value == "true" && settings.Element(ns + "DisallowStartIfOnBatteries")!.Value == "true", "idle and AC required");
 Check(settings.Element(ns + "IdleSettings")!.Element(ns + "StopOnIdleEnd")!.Value == "false" && settings.Element(ns + "ExecutionTimeLimit")!.Value == "PT0S", "no forced termination on activity or timeout");
+var logon = XDocument.Parse(TaskSetup.BuildXmlForUser(executable, 20, user));
+Check(logon.Root!.Element(ns + "Settings")!.Element(ns + "ExecutionTimeLimit")!.Value == "PT0S", "logon cleanup has no forced execution timeout");
 Check(root.Descendants(ns + "Command").Single().Value == executable && root.Descendants(ns + "UserId").Single().Value == user, "XML escapes user and executable");
 Check(root.Descendants(ns + "Arguments").Single().Value == "--silent", "silent command");
 bool invalid = false; try { TaskSetup.BuildIdleXml(executable, TimeSpan.FromDays(1), user, DateTime.Today); } catch (ArgumentOutOfRangeException) { invalid = true; }

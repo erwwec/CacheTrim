@@ -1,48 +1,39 @@
 using System;
 using System.Linq;
-using System.Speech.Recognition;
+using System.Threading;
 
 namespace DesktopPet;
 
-// One explicitly requested utterance. No wake word, continuous listening or app-side upload.
+// One explicitly requested short command; processing is local and never uploaded.
 internal sealed class VoiceCommandSession : IDisposable
 {
-    private readonly SpeechRecognitionEngine _engine;
+    private readonly OfflineKeywordSession _session;
     private readonly Action<string?, float, string?> _completed;
+    private Timer? _timeout;
+    private int _finished;
     public VoiceCommandSession(Action<string?, float, string?> completed)
     {
         _completed = completed;
-        var recognizer = SpeechRecognitionEngine.InstalledRecognizers()
-            .FirstOrDefault(r => r.Culture.TwoLetterISOLanguageName.Equals("ru", StringComparison.OrdinalIgnoreCase));
-        if (recognizer == null) throw new InvalidOperationException("Русский модуль распознавания речи SAPI не найден. Проверь установленные модули Windows; можно вводить команды текстом.");
-        _engine = new SpeechRecognitionEngine(recognizer);
-        try
-        {
-            var builder = new GrammarBuilder { Culture = recognizer.Culture };
-            builder.Append(new Choices(VoiceCommandCatalog.Phrases));
-            _engine.LoadGrammar(new Grammar(builder));
-            _engine.InitialSilenceTimeout = TimeSpan.FromSeconds(8);
-            _engine.BabbleTimeout = TimeSpan.FromSeconds(3);
-            _engine.EndSilenceTimeout = TimeSpan.FromSeconds(1);
-            _engine.RecognizeCompleted += OnCompleted;
-        }
-        catch { _engine.Dispose(); throw; }
+        _session = new OfflineKeywordSession(VoiceCommandCatalog.Phrases, text => VoiceCommandCatalog.Parse(Normalize(text)) != PetVoiceCommand.None,
+            (ok, text) =>
+            {
+                if (Interlocked.Exchange(ref _finished, 1) != 0) return;
+                _completed(ok ? Normalize(text) : null, ok ? 1 : 0, ok ? null : "Микрофон или локальное распознавание остановились.");
+            });
     }
+    private static string Normalize(string? text) => string.Join(" ", (text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(x => x != "[unk]"));
     public void Start()
     {
-        _engine.SetInputToDefaultAudioDevice();
-        _engine.RecognizeAsync(RecognizeMode.Single);
-    }
-    private void OnCompleted(object? sender, RecognizeCompletedEventArgs e)
-    {
-        if (e.Cancelled) { _completed(null, 0, "Прослушивание остановлено."); return; }
-        if (e.Error != null) { _completed(null, 0, "Не удалось распознать команду. Проверь микрофон и разрешения Windows."); return; }
-        _completed(e.Result?.Text, e.Result?.Confidence ?? 0, null);
+        _session.Start();
+        _timeout = new Timer(_ =>
+        {
+            if (Interlocked.Exchange(ref _finished, 1) == 0) _completed(null, 0, "Команда не распознана за 8 секунд.");
+        }, null, TimeSpan.FromSeconds(8), Timeout.InfiniteTimeSpan);
     }
     public void Dispose()
     {
-        _engine.RecognizeCompleted -= OnCompleted;
-        try { _engine.RecognizeAsyncCancel(); } catch (InvalidOperationException) { }
-        _engine.Dispose();
+        Interlocked.Exchange(ref _finished, 1);
+        _timeout?.Dispose();
+        _session.Dispose();
     }
 }

@@ -11,6 +11,7 @@ public partial class MainWindow
     private void ShowReleaseHistory()
     {
         BeginPage("Что нового", "История публичных версий CacheTrim: от новых к старым. Для полной истории нужен интернет.");
+        _pageContent.Children.Add(Card("Клод V2 — тестовая версия", new TextBlock { Text = "Функция находится в разработке. Возможны ошибки; работа голосового управления и управления ПК требует проверки на Windows.", Foreground = Brush(Theme.Text), TextWrapping = TextWrapping.Wrap }));
         var status = new TextBlock { Text = "Загружаем историю версий с GitHub…", Foreground = Brush(Theme.Muted), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
         var list = new StackPanel();
         Wpf.Ui.Controls.Button refresh = null;

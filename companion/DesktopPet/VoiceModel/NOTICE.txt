@@ -1,0 +1,1 @@
+Vosk offline toolkit: https://github.com/alphacep/vosk-api (Apache-2.0). Russian model vosk-model-small-ru-0.22: https://alphacephei.com/vosk/models (Apache-2.0). Original model archive SHA-256: 961d5ff98a17f4aa6de69864d0aa71fa5bac682301d2b5d17a3f24c5c99a46d4.

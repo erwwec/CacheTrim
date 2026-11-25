@@ -58,6 +58,12 @@ internal static class Program
             Check(AnimeAvatarPackage.TryOpenVerified(path, new string('0', 64), executable.Length) == null, "tampered avatar is not opened for launch");
             using (var locked = PetCache.TryOpenVerified(path, petHash)) Check(locked != null, "matching cached pet verified");
             Check(PetCache.TryOpenVerified(path, new string('0', 64)) == null, "tampered cached pet rejected");
+            string installed = Path.Combine(dir, "installed", "DesktopPet.exe");
+            Check(PetCache.TryInstallBundled(path, installed, petHash) && File.ReadAllBytes(installed).SequenceEqual(executable), "verified bundled pet installed");
+            byte[] tampered = (byte[])executable.Clone(); tampered[4] = 1; File.WriteAllBytes(path, tampered);
+            Check(!PetCache.TryInstallBundled(path, installed, petHash) && File.ReadAllBytes(installed).SequenceEqual(executable), "tampered bundled pet cannot replace verified copy");
+            Check(!Directory.EnumerateFiles(Path.GetDirectoryName(installed)!, "*.download").Any(), "no bundled staging files left");
+            Check(PetCache.IsPreviousReleaseHash(PetCache.PreviousVersions[0].Hash.ToUpperInvariant()) && !PetCache.IsPreviousReleaseHash(petHash), "old release pins identified separately from V2");
             Check(PetCache.TryOpenVerified(path, "bad") == null, "invalid trust hash rejected");
             File.WriteAllBytes(path, new byte[] { (byte)'M', (byte)'Z' });
             Check(PetCache.TryOpenVerified(path, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))) == null, "undersized executable rejected");

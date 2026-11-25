@@ -94,6 +94,7 @@ public partial class App : Application
         Log("автоочистка при входе запущена");
         try
         {
+            config = Config.Load(requireValidExisting: true);
             Cleaner cleaner = new(Log);
             cleaner.Run(config);
             Native.MemStats stats = Native.GetMemoryStats();

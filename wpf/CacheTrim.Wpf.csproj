@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- The shipped pet is pinned in the app; release CI overrides this with the hash of its own pet build. -->
-    <TrustedDesktopPetSha256 Condition="'$(TrustedDesktopPetSha256)' == ''">76de5744780dd950e428a514d3b6c36fc30d407dcd57c815ef1df082738c2dab</TrustedDesktopPetSha256>
+    <TrustedDesktopPetSha256 Condition="'$(TrustedDesktopPetSha256)' == ''">68bd1de9760e55c1cd09f8bfc95569c473ff408725d0f454dde101b8f5218410</TrustedDesktopPetSha256>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>CacheTrim</RootNamespace>
     <AssemblyName>CacheTrim</AssemblyName>
-    <Version>2.1.17</Version>
-    <AssemblyVersion>2.1.17.0</AssemblyVersion>
-    <FileVersion>2.1.17.0</FileVersion>
-    <InformationalVersion>2.1.17</InformationalVersion>
+    <Version>2.1.17.1</Version>
+    <AssemblyVersion>2.1.17.1</AssemblyVersion>
+    <FileVersion>2.1.17.1</FileVersion>
+    <InformationalVersion>2.1.17.1</InformationalVersion>
     <ApplicationManifest>..\app.manifest</ApplicationManifest>
-    <Nullable>disable</Nullable>
+    <Nullable>annotations</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>

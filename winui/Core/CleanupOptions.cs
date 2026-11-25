@@ -16,12 +16,25 @@ namespace CacheTrim
         public static readonly string[] BrowserNames = { "Chrome", "Edge", "Brave", "Vivaldi", "Chromium", "Yandex", "Opera" };
         public static readonly string[] Categories = { "temp", "browsers", "shaders", "thumbnails", "reports", "dumps", "updates", "uwp", "prefetch", "logs" };
 
-        public static CleanupOptions Load()
+        public static CleanupOptions Load() => LoadFromPath(PathName);
+
+        internal static CleanupOptions LoadFromPath(string path)
         {
-            if (!File.Exists(PathName)) return new CleanupOptions();
             try
             {
-                var options = JsonSerializer.Deserialize<CleanupOptions>(File.ReadAllText(PathName));
+                string json;
+                try { json = File.ReadAllText(path); }
+                catch (FileNotFoundException) { return new CleanupOptions(); }
+                catch (DirectoryNotFoundException) { return new CleanupOptions(); }
+                using var document = JsonDocument.Parse(json);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    throw new InvalidDataException("Настройки очистки должны быть объектом.");
+                foreach (string field in new[] { "ExcludedPaths", "MinimumAgeHours", "Browsers" })
+                {
+                    if (document.RootElement.EnumerateObject().Count(p => p.NameEquals(field)) != 1)
+                        throw new InvalidDataException("Отсутствует или повторяется поле настроек: " + field);
+                }
+                var options = JsonSerializer.Deserialize<CleanupOptions>(json);
                 if (options == null || options.ExcludedPaths == null || options.MinimumAgeHours == null || options.Browsers == null)
                     throw new InvalidDataException("Настройки очистки неполные.");
                 options.Validate();
@@ -29,7 +42,7 @@ namespace CacheTrim
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException || ex is ArgumentException || ex is NotSupportedException)
             {
-                throw new InvalidDataException("Не удалось прочитать исключения очистки. Очистка остановлена, чтобы не удалить защищённые файлы: " + ex.Message, ex);
+                throw new InvalidDataException("Не удалось прочитать правила очистки. Очистка остановлена. Сохрани копию и восстанови файл " + path + ": " + ex.Message, ex);
             }
         }
 

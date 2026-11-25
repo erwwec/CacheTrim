@@ -23,6 +23,8 @@ public partial class MainWindow
         save.Click += async (_, _) => {
             if (!TimeSpan.TryParseExact(time.Text.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var parsed) || parsed >= TimeSpan.FromDays(1)) { MessageBox.Show(window, "Укажи время в формате 00:00–23:59."); return; }
             if (MessageBox.Show(window, "Включить ежедневную очистку выбранных категорий в " + time.Text + " при простое?", "Расписание", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            try { _settings.EnsureCleanupSnapshotReadable(); Config.EnsureCleanupSettingsReadable(true); CleanupOptions.Load(); }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message + "\n\nПеред включением сохрани настройки очистки.", "Расписание", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
             save.IsEnabled = false; remove.IsEnabled = false;
             string exe = Environment.ProcessPath ?? string.Empty;
             string error = await Task.Run(() => TaskSetup.InstallIdle(exe, parsed));

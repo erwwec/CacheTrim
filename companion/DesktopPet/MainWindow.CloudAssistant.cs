@@ -15,12 +15,31 @@ public partial class MainWindow
     private CancellationTokenSource? _cloudCancellation;
     private CloudVoiceRecorder? _cloudRecorder;
     private bool _screenRequest;
+    private bool _computerStopListening;
+    private readonly ConversationHistory _conversation = new();
+
+    private void AssistantContext_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_cloudCancellation != null) StopCloud();
+        _conversation.Clear();
+        AssistantCloudStatus.Text = AssistantContext.IsChecked == true
+            ? "Контекст диалога включён на время этого запуска."
+            : "Контекст выключен, история очищена.";
+    }
+
+    private void ClearAssistantContext_Click(object sender, RoutedEventArgs e)
+    {
+        bool running = _cloudCancellation != null;
+        if (running) StopCloud();
+        _conversation.Clear();
+        AssistantCloudStatus.Text = running ? "История очищена; текущий запрос остановлен." : "История диалога очищена.";
+    }
     private void UpdateAssistantBadge()
     {
-        bool listening = _voiceSession != null || (_cloudCancellation != null && _cloudRecorder != null);
+        bool listening = _voiceSession != null || _wakeSession != null || _computerStopListening || (_cloudCancellation != null && _cloudRecorder != null);
         bool working = _cloudCancellation != null;
         AssistantBadge.Visibility = listening || working ? Visibility.Visible : Visibility.Collapsed;
-        AssistantBadgeText.Text = listening ? "● МИКРОФОН" : _screenRequest ? "● ЭКРАН → ИИ" : "● ИИ РАБОТАЕТ";
+        AssistantBadgeText.Text = _computerStopListening ? "● СТОП-МИКРОФОН + ЭКРАН → ИИ" : _wakeSession != null ? "● СЛУШАЮ ДЖАРВИС" : listening ? "● МИКРОФОН" : _screenRequest ? "● ЭКРАН → ИИ" : "● ИИ РАБОТАЕТ";
     }
     private static string CloudKeyPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeDesktopPet", "groq-key.dat");
 
@@ -41,7 +60,7 @@ public partial class MainWindow
     private void DeleteCloudKey_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
-        StopCloud();
+        StopCloud(); DisableWakeWord();
         try { File.Delete(CloudKeyPath); AssistantApiKey.Clear(); AssistantCloudStatus.Text = "Сохранённый ключ удалён с этого ПК."; }
         catch { AssistantCloudStatus.Text = "Не удалось удалить ключ."; }
     }
@@ -50,7 +69,8 @@ public partial class MainWindow
         var cts = _cloudCancellation;
         _cloudCancellation = null;
         _screenRequest = false;
-        if (cts != null) { cts.Cancel(); cts.Dispose(); }
+        // The request owns disposal: it may still need its token while unwinding.
+        if (cts != null) cts.Cancel();
         _cloudRecorder?.Stop();
         UpdateAssistantBadge();
         AssistantCloudButton.Content = "Спросить ИИ";
@@ -100,12 +120,14 @@ public partial class MainWindow
         catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось снять экран или связаться с Groq."; }
         finally
         {
-            if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; cts.Dispose(); UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantScreenButton.Content = "Спросить ИИ об экране"; }
+            if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantScreenButton.Content = "Спросить ИИ об экране"; }
+            cts.Dispose();
         }
     }
     private void CloudVoice_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
+        if (_wakeEnabled) { AssistantCloudStatus.Text = "Для этой кнопки сначала выключи вызов «Джарвис» или используй голосовой вызов."; return; }
         if (_cloudRecorder != null) { _cloudRecorder.Stop(); return; }
         if (_cloudCancellation != null) return;
         if (_voiceSession != null) { AssistantCloudStatus.Text = "Сначала останови локальное прослушивание."; return; }
@@ -142,6 +164,7 @@ public partial class MainWindow
                 }
             }
             AssistantCloudStatus.Text = "Запрос отправлен в Groq…";
+            var history = AssistantContext.IsChecked == true ? _conversation.Snapshot() : null;
             var answer = await CloudAssistant.AskAsync(CloudHttp, key, question!, async (name, arguments, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -152,7 +175,15 @@ public partial class MainWindow
                 {
                     case "open_youtube":
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.youtube.com/") { UseShellExecute = true });
-                        return "Открыта главная страница YouTube. Видео не выбиралось.";
+                        return "Windows получила запрос открыть главную страницу YouTube; видео не выбиралось.";
+                    case "search_youtube":
+                        using (var search = System.Text.Json.JsonDocument.Parse(arguments))
+                        {
+                            if (!CloudAssistant.TryGetSearchQuery(search.RootElement, out string query)) return "Поисковый запрос недопустим.";
+                            ct.ThrowIfCancellationRequested();
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(CloudAssistant.YouTubeSearchUrl(query)) { UseShellExecute = true });
+                            return "Windows получила запрос открыть результаты поиска YouTube; видео не выбиралось и воспроизведение не подтверждено.";
+                        }
                     case "open_telegram":
                         string[] candidates = {
                             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Telegram Desktop", "Telegram.exe"),
@@ -185,8 +216,9 @@ public partial class MainWindow
                         return "Открыта папка загрузок.";
                     default: return "Действие недоступно.";
                 }
-            }, cts.Token);
+            }, cts.Token, history);
             if (!ReferenceEquals(_cloudCancellation, cts) || _isClosing || !_experimentalModel) return;
+            if (AssistantContext.IsChecked == true) _conversation.AddTurn(question!, answer);
             _reminderHoldUntil = DateTime.MinValue; _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
             ShowSpeech(answer); AssistantCloudStatus.Text = answer;
         }
@@ -194,7 +226,8 @@ public partial class MainWindow
         catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось связаться с Groq. Проверь интернет и ключ."; }
         finally
         {
-            if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; cts.Dispose(); UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantCloudVoiceButton.Content = "Сказать задачу ИИ"; }
+            if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantCloudVoiceButton.Content = "Сказать задачу ИИ"; }
+            cts.Dispose();
         }
     }
 }
