@@ -136,8 +136,10 @@
                             <TextBlock Text="Голос: запись до 15 секунд отправляется в Groq для распознавания. Постоянного прослушивания нет." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                             <Button x:Name="AssistantCloudVoiceButton" Content="Сказать задачу ИИ" Click="CloudVoice_Click" />
                             <Button x:Name="AssistantCloudButton" Content="Спросить ИИ" Click="AskCloud_Click" />
+                            <Button x:Name="AssistantScreenButton" Content="Спросить ИИ об экране" Click="AskScreen_Click" />
+                            <TextBlock Text="По этой кнопке снимок основного экрана, включая открытые личные данные, отправляется в Groq. Сейчас это только просмотр — управление мышью и клавиатурой не готово." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,5" />
                             <TextBlock x:Name="AssistantCloudStatus" Text="ИИ не запущен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,4" />
-                            <TextBlock Text="ИИ может открыть YouTube, Telegram Desktop и загрузки, создать текстовую презентацию, назвать время, прыгнуть или принести секрет. Он пока не видит экран и не выбирает видео." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <TextBlock Text="ИИ может открыть YouTube, Telegram Desktop и загрузки, создать текстовую презентацию, назвать время, прыгнуть или принести секрет. Просмотр экрана работает отдельно; управление мышью и выбор видео пока не готовы." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                         </StackPanel>
                     </Expander>
                     <Expander x:Name="BehaviorSection" Header="Поведение и секреты">

@@ -14,12 +14,13 @@ public partial class MainWindow
     private static readonly HttpClient CloudHttp = new() { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 524288 };
     private CancellationTokenSource? _cloudCancellation;
     private CloudVoiceRecorder? _cloudRecorder;
+    private bool _screenRequest;
     private void UpdateAssistantBadge()
     {
         bool listening = _voiceSession != null || (_cloudCancellation != null && _cloudRecorder != null);
         bool working = _cloudCancellation != null;
         AssistantBadge.Visibility = listening || working ? Visibility.Visible : Visibility.Collapsed;
-        AssistantBadgeText.Text = listening ? "● МИКРОФОН" : "● ИИ РАБОТАЕТ";
+        AssistantBadgeText.Text = listening ? "● МИКРОФОН" : _screenRequest ? "● ЭКРАН → ИИ" : "● ИИ РАБОТАЕТ";
     }
     private static string CloudKeyPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeDesktopPet", "groq-key.dat");
 
@@ -48,10 +49,12 @@ public partial class MainWindow
     {
         var cts = _cloudCancellation;
         _cloudCancellation = null;
+        _screenRequest = false;
         if (cts != null) { cts.Cancel(); cts.Dispose(); }
         _cloudRecorder?.Stop();
         UpdateAssistantBadge();
         AssistantCloudButton.Content = "Спросить ИИ";
+        AssistantScreenButton.Content = "Спросить ИИ об экране";
         AssistantCloudVoiceButton.Content = "Сказать задачу ИИ";
         AssistantCloudStatus.Text = "ИИ не запущен";
     }
@@ -63,6 +66,42 @@ public partial class MainWindow
         string question = AssistantCloudText.Text.Trim();
         if (string.IsNullOrWhiteSpace(question)) { AssistantCloudStatus.Text = "Напиши задачу."; return; }
         _ = RunCloudAsync(question, false);
+    }
+    private async void AskScreen_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_experimentalModel || _isClosing) return;
+        if (_cloudCancellation != null) { StopCloud(); return; }
+        if (_voiceSession != null) { AssistantCloudStatus.Text = "Сначала останови локальное прослушивание."; return; }
+        string question = AssistantCloudText.Text.Trim();
+        if (string.IsNullOrWhiteSpace(question)) { AssistantCloudStatus.Text = "Напиши, что посмотреть на экране."; return; }
+        string key;
+        try { key = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CloudKeyPath), null, DataProtectionScope.CurrentUser)); }
+        catch { AssistantCloudStatus.Text = "Сначала сохрани ключ бесплатного аккаунта Groq."; return; }
+        var cts = new CancellationTokenSource();
+        _cloudCancellation = cts;
+        _screenRequest = true;
+        UpdateAssistantBadge();
+        AssistantCloudButton.Content = "Остановить запрос";
+        AssistantScreenButton.Content = "Остановить просмотр";
+        AssistantCloudStatus.Text = "Делаю и отправляю снимок основного экрана в Groq…";
+        try
+        {
+            // Hide the menu so it doesn't cover the requested screen; give the popup time to close.
+            SettingsPopup.IsOpen = false;
+            await Task.Delay(250, cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
+            byte[] image = ScreenCapture.CapturePrimaryJpeg();
+            string answer = await ScreenVision.AskAsync(CloudHttp, key, question, image, cts.Token);
+            if (!ReferenceEquals(_cloudCancellation, cts) || _isClosing || !_experimentalModel) return;
+            _reminderHoldUntil = DateTime.MinValue; _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
+            ShowSpeech(answer); AssistantCloudStatus.Text = answer;
+        }
+        catch (OperationCanceledException) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = "Просмотр остановлен или истекло время ожидания."; }
+        catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось снять экран или связаться с Groq."; }
+        finally
+        {
+            if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; cts.Dispose(); UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantScreenButton.Content = "Спросить ИИ об экране"; }
+        }
     }
     private void CloudVoice_Click(object sender, RoutedEventArgs e)
     {

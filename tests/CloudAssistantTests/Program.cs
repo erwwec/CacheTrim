@@ -61,6 +61,13 @@ try
     if (!string.IsNullOrWhiteSpace(preview)) File.Copy(pptx, preview, true);
 }
 finally { if (Directory.Exists(temp)) Directory.Delete(temp, true); }
+mock.Responses.Enqueue("{\"choices\":[{\"message\":{\"content\":\"На экране рабочий стол.\"}}]}");
+var vision = await ScreenVision.AskAsync(client, "example-test-key", "Что видно?", new byte[] { 0xff, 0xd8, 0xff, 0xd9 }, CancellationToken.None);
+var visionRequest = JsonDocument.Parse(mock.Bodies[^1]).RootElement;
+Check(vision.Contains("рабочий стол") && visionRequest.GetProperty("model").GetString() == "qwen/qwen3.8-27b", "vision uses cloud model and returns response");
+Check(visionRequest.GetProperty("messages")[1].GetProperty("content")[1].GetProperty("image_url").GetProperty("url").GetString()!.StartsWith("data:image/jpeg;base64,"), "vision attaches image only for explicit request");
+try { await ScreenVision.AskAsync(client, "example-test-key", "посмотри", Array.Empty<byte>(), CancellationToken.None); throw new Exception("empty image accepted"); }
+catch (ArgumentException) { Check(true, "empty screenshot rejected before network"); }
 Console.WriteLine("All cloud assistant tests passed.");
 
 sealed class FakeHandler : HttpMessageHandler
