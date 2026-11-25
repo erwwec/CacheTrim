@@ -29,10 +29,14 @@ internal static class Program
             b = Process.Start(new ProcessStartInfo(decoy) { UseShellExecute = false })!;
             for (int i = 0; i < 80 && (!HasWindow(a.Id) || !HasWindow(b.Id)); i++) { if (a.HasExited || b.HasExited) throw new Exception("Test pet exited early"); Thread.Sleep(500); }
             if (!HasWindow(a.Id) || !HasWindow(b.Id)) throw new Exception("Pet windows not found");
+            var isRunning = typeof(MainWindow).GetMethod("IsKnownCompanionRunning", BindingFlags.Static | BindingFlags.NonPublic)!;
+            if (!(bool)isRunning.Invoke(null, new object[] { target })!) throw new Exception("Matching companion was not detected");
+            if ((bool)isRunning.Invoke(null, new object[] { Path.Combine(root, "missing", "DesktopPet.exe") })!) throw new Exception("Unrelated same-named process caused a false match");
             var close = typeof(MainWindow).GetMethod("CloseKnownCompanion", BindingFlags.Static | BindingFlags.NonPublic)!;
             close.Invoke(null, new object[] { target });
             if (!a.WaitForExit(3000)) throw new Exception("Matching pet did not close");
             if (b.HasExited) throw new Exception("Unrelated same-named pet was closed");
+            if ((bool)isRunning.Invoke(null, new object[] { target })!) throw new Exception("Unrelated pet falsely blocks target after restart");
             Console.WriteLine("Restart closes only the companion at the expected path.");
         }
         finally {

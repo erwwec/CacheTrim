@@ -29,33 +29,54 @@ internal static class ReleaseHistory
             (string.IsNullOrWhiteSpace(r.Notes) ? "Подробное описание этого релиза отсутствует." : r.Notes.Trim())));
     }
 
-    internal static async Task<string> FetchAsync(string api, string previous, string current, CancellationToken cancellationToken)
+    internal sealed record ReleaseEntry(string Version, string Notes, DateTimeOffset? PublishedAt);
+    internal sealed record HistoryResult(IReadOnlyList<ReleaseEntry> Releases, bool Complete);
+
+    // Only numbered, public, stable GitHub releases are displayed. Never execute
+    // markup or links from a release description; it is untrusted text.
+    internal static List<ReleaseEntry> ReadPage(JsonElement root)
     {
-        Version old = ParseVersion(previous);
-        if (old == null || ParseVersion(current) == null) return null;
+        var result = new List<ReleaseEntry>();
+        foreach (var item in root.EnumerateArray())
+        {
+            if ((item.TryGetProperty("draft", out var draft) && draft.GetBoolean()) ||
+                (item.TryGetProperty("prerelease", out var pre) && pre.GetBoolean())) continue;
+            string tag = item.GetProperty("tag_name").GetString();
+            if (ParseVersion(tag) == null) continue;
+            string notes = item.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() : "";
+            DateTimeOffset? published = item.TryGetProperty("published_at", out var date) && date.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(date.GetString(), out var parsed) ? parsed : null;
+            result.Add(new ReleaseEntry(tag, notes ?? "", published));
+        }
+        return result;
+    }
+
+    internal static IReadOnlyList<ReleaseEntry> SortReleases(IEnumerable<ReleaseEntry> releases) =>
+        releases.OrderByDescending(r => ParseVersion(r.Version)).ToList();
+
+    internal static async Task<HistoryResult> FetchAllAsync(string api, string userAgentVersion, CancellationToken cancellationToken)
+    {
         using var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("CacheTrim/" + current);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("CacheTrim/" + userAgentVersion);
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        var releases = new List<(string Version, string Notes)>();
+        var releases = new List<ReleaseEntry>();
         string endpoint = api.EndsWith("/latest", StringComparison.OrdinalIgnoreCase) ? api.Substring(0, api.Length - 7) : api;
         for (int page = 1; page <= 10; page++)
         {
             using var response = await client.GetAsync(endpoint + "?per_page=100&page=" + page, cancellationToken);
             response.EnsureSuccessStatusCode();
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-            int count = 0;
-            foreach (var item in json.RootElement.EnumerateArray())
-            {
-                count++;
-                if ((item.TryGetProperty("draft", out var draft) && draft.GetBoolean()) ||
-                    (item.TryGetProperty("prerelease", out var pre) && pre.GetBoolean())) continue;
-                string tag = item.GetProperty("tag_name").GetString();
-                Version number = ParseVersion(tag);
-                if (number == null) continue;
-                releases.Add((tag, item.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() : ""));
-            }
-            if (count < 100) return Format(releases, previous, current);
+            int count = json.RootElement.GetArrayLength();
+            releases.AddRange(ReadPage(json.RootElement));
+            if (count < 100) return new HistoryResult(SortReleases(releases), true);
         }
-        return null; // Do not claim a complete history if pagination was truncated.
+        return new HistoryResult(SortReleases(releases), false);
+    }
+
+    internal static async Task<string> FetchAsync(string api, string previous, string current, CancellationToken cancellationToken)
+    {
+        if (ParseVersion(previous) == null || ParseVersion(current) == null) return null;
+        HistoryResult history = await FetchAllAsync(api, current, cancellationToken);
+        // Do not claim a complete history if pagination was truncated.
+        return history.Complete ? Format(history.Releases.Select(r => (r.Version, r.Notes)), previous, current) : null;
     }
 }

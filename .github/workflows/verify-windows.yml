@@ -99,6 +99,16 @@ jobs:
         run: |
           dotnet run --project .\tests\DisplayDiagnosticsTests\DisplayDiagnosticsTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Display diagnostics tests failed' }
+      - name: Test V2 cloud assistant safeguards
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CloudAssistantTests\CloudAssistantTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Cloud assistant safeguards failed' }
+      - name: Test V2 assistant command allowlist
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\VoiceCommandTests\VoiceCommandTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'V2 command tests failed' }
       - name: Test pet speech bubble state
         shell: pwsh
         run: |

@@ -156,6 +156,7 @@ public partial class MainWindow : Window
         AddNav("Питомец", "◆", "pet");
         AddNav("Автозагрузка", "⏻", "startup");
         AddNav("Журнал", "≡", "log");
+        AddNav("Что нового", "✦", "whatsnew");
         AddNav("Настройки", "⚙", "settings");
     }
 
@@ -195,6 +196,7 @@ public partial class MainWindow : Window
             case "startup": ShowStartup(); break;
             case "log": ShowLog(); break;
             case "settings": ShowSettings(); break;
+            case "whatsnew": ShowReleaseHistory(); break;
             default: ShowMemory(); break;
         }
     }
