@@ -40,4 +40,25 @@ if (args.Length == 4)
         Check(matched, "synthetic speech " + (sample == 0 ? "wake" : sample == 1 ? "stop" : "quick command") + " detected; last=" + last);
     }
 }
+using (var full = VoskNative.CreateFull(model))
+{
+    Check(VoskNative.Accept(full, new byte[3200], 3200) >= 0, "unrestricted recognizer accepts audio");
+    using var final = JsonDocument.Parse(VoskNative.FinalResult(full));
+    Check(final.RootElement.TryGetProperty("text", out _), "unrestricted recognizer returns final text");
+}
+using (var stream = new MemoryStream())
+{
+    using (var writer = new NAudio.Wave.WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(stream), new NAudio.Wave.WaveFormat(16000, 16, 1))) writer.Write(new byte[6400], 0, 6400);
+    try { OfflineSpeech.Transcribe(stream.ToArray(), args[0], CancellationToken.None); throw new Exception("silence accepted as speech"); }
+    catch (InvalidOperationException e) { Check(e.Message.Contains("Не удалось распознать"), "silence rejected without cloud fallback"); }
+    try { OfflineSpeech.Transcribe(stream.ToArray(), args[0], new CancellationToken(true)); throw new Exception("cancellation ignored"); }
+    catch (OperationCanceledException) { Check(true, "local transcription cancels"); }
+}
+var speechSample = Environment.GetEnvironmentVariable("CACHETRIM_TEST_SPEECH_WAV");
+if (!string.IsNullOrEmpty(speechSample))
+{
+    var recognized = OfflineSpeech.Transcribe(File.ReadAllBytes(speechSample), args[0], CancellationToken.None);
+    Console.WriteLine("Synthetic speech transcription: " + recognized);
+    Check(recognized.Contains("открой") && recognized.Contains("громкость"), "free-form Russian synthetic speech recognized locally");
+}
 Console.WriteLine("Offline model and native API tests passed; microphone and Windows not tested.");

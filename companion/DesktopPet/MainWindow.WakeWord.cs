@@ -24,10 +24,12 @@ public partial class MainWindow
             using var identity = WindowsIdentity.GetCurrent();
             if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
             { AssistantCloudStatus.Text = "Для вызова Джарвиса запусти DesktopPet.exe без прав администратора."; return; }
-            _ = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CloudKeyPath), null, DataProtectionScope.CurrentUser));
+            _ = LoadKey(SelectedAiProvider);
+            if (!LocalSpeech) _ = LoadKey(AiProvider.Groq);
         }
-        catch { AssistantCloudStatus.Text = "Не удалось проверить права или ключ Groq. Сохрани ключ и запусти питомца без администратора."; return; }
-        if (MessageBox.Show("Пока режим включён, микрофон постоянно слушает слово «Джарвис» через локальный Vosk. Возможны ложные срабатывания. После каждого срабатывания приложение запишет до 15 секунд и отправит запись в Groq; затем может отправлять снимки экрана. Работа с ПК может идти автоматически по настройке ниже. Не оставляй режим без присмотра; закрой личные данные. Режим выключается кнопкой и не включается автоматически после перезапуска. Включить?", "Голосовой вызов Джарвиса", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        catch (InvalidOperationException ex) { AssistantCloudStatus.Text = ex.Message; return; }
+        catch { AssistantCloudStatus.Text = "Не удалось проверить права. Запусти питомца без администратора."; return; }
+        if (MessageBox.Show("Пока режим включён, микрофон постоянно слушает слово «Джарвис» локально. Возможны ложные срабатывания. После каждого срабатывания приложение запишет до 15 секунд. " + (LocalSpeech ? "Речь распознаётся локально. " : "Запись отправляется в Groq для распознавания. ") + "Текст и снимки экрана могут отправляться в " + AiProviderConfig.Name(SelectedAiProvider) + ". Работа с ПК может идти автоматически. Не оставляй режим без присмотра; закрой личные данные. Режим выключается кнопкой и не включается автоматически после перезапуска. Включить?", "Голосовой вызов Джарвиса", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         _wakeEnabled = true; StartWakeEngine();
     }
 

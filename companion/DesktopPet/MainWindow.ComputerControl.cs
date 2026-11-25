@@ -32,13 +32,16 @@ public partial class MainWindow
         bool voiceStop = AssistantVoiceStop.IsChecked == true;
         string goal = AssistantCloudText.Text.Trim();
         if (!recordVoice && (goal.Length == 0 || goal.Length > 1000)) { AssistantCloudStatus.Text = "Напиши задачу до 1000 символов."; return; }
-        string key;
-        try { key = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CloudKeyPath), null, DataProtectionScope.CurrentUser)); }
-        catch { AssistantCloudStatus.Text = "Сначала сохрани ключ Groq."; return; }
+        var provider = SelectedAiProvider;
+        bool localSpeech = LocalSpeech;
+        string providerName = AiProviderConfig.Name(provider);
+        string key; string? groqKey = null;
+        try { key = LoadKey(provider); if (recordVoice && !localSpeech) groqKey = LoadKey(AiProvider.Groq); }
+        catch (InvalidOperationException ex) { AssistantCloudStatus.Text = ex.Message; return; }
         string modeWarning = automatic
             ? "АВТОМАТИЧЕСКИЙ РЕЖИМ: после запуска ИИ будет нажимать, вводить текст и запускать приложения без подтверждения каждого шага. Он может ошибиться, изменить или отправить данные. Фильтр опасных действий НЕ надёжен. Следи за работой и используй кнопку остановки. "
             : "Каждый шаг потребует подтверждения. ";
-        var consent = fromWake ? MessageBoxResult.Yes : MessageBox.Show((recordVoice ? "Голосовая запись до 15 секунд будет отправлена в Groq для распознавания. " : "") + "На каждом шаге снимок ОСНОВНОГО экрана целиком будет отправлен в Groq, включая видимые личные данные. " + modeWarning + (voiceStop ? "Во время задачи микрофон непрерывно слушает команды «стоп» через локальный Vosk; аудио этого режима приложение в Groq не отправляет. Голосовая остановка может не сработать. " : "Голосовая остановка выключена; доступна кнопка. ") + "Не используй пароли, коды или платёжные данные. Закрой лишние окна. Продолжить?", "Управление компьютером", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var consent = fromWake ? MessageBoxResult.Yes : MessageBox.Show((recordVoice ? (localSpeech ? "Речь распознаётся локально. " : "Голосовая запись до 15 секунд будет отправлена в Groq для распознавания. ") : "") + "На каждом шаге снимок ОСНОВНОГО экрана целиком будет отправлен в " + providerName + ", включая видимые личные данные. " + modeWarning + (voiceStop ? "Во время задачи микрофон непрерывно слушает команды «стоп» через локальный Vosk; аудио этого режима приложение в Groq не отправляет. Голосовая остановка может не сработать. " : "Голосовая остановка выключена; доступна кнопка. ") + "Не используй пароли, коды или платёжные данные. Закрой лишние окна. Продолжить?", "Управление компьютером", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (consent != MessageBoxResult.Yes) return;
         var cts = new CancellationTokenSource(); _cloudCancellation = cts; UpdateAssistantBadge();
         var panel = new ComputerControlPanel(() => { if (!cts.IsCancellationRequested) cts.Cancel(); });
@@ -65,8 +68,8 @@ public partial class MainWindow
                     }
                     finally { panel.SetRecordingAction(null); if (ReferenceEquals(_cloudRecorder, recorder)) { _cloudRecorder = null; UpdateAssistantBadge(); } }
                     cts.Token.ThrowIfCancellationRequested();
-                    panel.Processing("Отправляю запись в Groq для распознавания…");
-                    goal = await CloudSpeech.TranscribeAsync(CloudHttp, key, audio, cts.Token);
+                    panel.Processing(localSpeech ? "Распознаю речь локально…" : "Отправляю запись в Groq для распознавания…");
+                    goal = await TranscribeAsync(audio, localSpeech, groqKey, cts.Token);
                 }
                 cts.Token.ThrowIfCancellationRequested();
                 if (string.IsNullOrWhiteSpace(goal) || goal.Length > 1000) throw new InvalidOperationException("Голосовая задача пуста или слишком длинная.");
@@ -107,8 +110,8 @@ public partial class MainWindow
                 if (target == IntPtr.Zero || ComputerInput.IsOurWindow(target)) throw new InvalidOperationException("Выбери нужное окно перед запуском задачи и попробуй ещё раз.");
                 var screenSize = ScreenCapture.PrimarySize();
                 byte[] screenshot = ScreenCapture.CapturePrimaryJpeg();
-                panel.Processing("Шаг " + (i + 1) + ": снимок отправляется в Groq. Ожидаю предложение ИИ…"); panel.Show();
-                var step = await ComputerAgent.NextAsync(CloudHttp, key, goal, previous, screenshot, cts.Token);
+                panel.Processing("Шаг " + (i + 1) + ": снимок отправляется в " + providerName + ". Ожидаю предложение ИИ…"); panel.Show();
+                var step = await ComputerAgent.NextAsync(CloudHttp, key, goal, previous, screenshot, cts.Token, provider);
                 cts.Token.ThrowIfCancellationRequested();
                 if (step.Action is "done" or "ask_user")
                 {
@@ -152,7 +155,7 @@ public partial class MainWindow
             AssistantCloudStatus.Text = "Достигнут предел 20 шагов. Проверь результат и при необходимости запусти новую задачу.";
         }
         catch (OperationCanceledException) { AssistantCloudStatus.Text = (Volatile.Read(ref voiceStopOutcome) == 1 ? "Распознано «стоп». " : Volatile.Read(ref voiceStopOutcome) == 2 ? "Голосовая остановка отключилась, поэтому задача остановлена. " : "") + "Управление остановлено. Уже выполненные действия не отменяются."; }
-        catch (Exception ex) { AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось продолжить управление. Проверь окно и доступность Groq."; }
+        catch (Exception ex) { AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось продолжить управление. Проверь окно и доступность выбранного ИИ."; }
         finally
         {
             try { stopSession?.Dispose(); } catch { }

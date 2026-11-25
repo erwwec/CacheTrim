@@ -110,6 +110,10 @@ public partial class MainWindow : Window
             if (arg.Equals("--model=experimental", StringComparison.OrdinalIgnoreCase)) { _experimentalModel = true; modelOverridden = true; }
         }
         InitializeComponent();
+        AssistantProvider.SelectedIndex = _aiProviderIndex;
+        AssistantSpeechProvider.SelectedIndex = _speechProviderIndex;
+        AssistantCommandSelector.ItemsSource = VoiceCommandCatalog.Phrases;
+        AssistantKeyLabel.Text = "Ключ " + AiProviderConfig.Name(SelectedAiProvider);
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
         AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
         _uiScale = PetPolicy.NearestSize(_uiScale);
@@ -987,6 +991,8 @@ public partial class MainWindow : Window
             _savedLeft = ParseSetting(values, 15, double.NaN, -100000, 100000);
             _savedTop = ParseSetting(values, 16, double.NaN, -100000, 100000);
             _experimentalModel = values.Length > 17 && bool.TryParse(values[17], out var experimental) && experimental;
+            _aiProviderIndex = values.Length > 18 && values[18] == "1" ? 1 : 0;
+            _speechProviderIndex = values.Length > 19 && values[19] == "1" ? 1 : 0;
             _lyricsEnabled = values.Length > 11 && bool.TryParse(values[11], out var lyrics) && lyrics;
             if (values.Length > 9)
                 _collectionItems.AddRange(values[9].Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -1022,7 +1028,7 @@ public partial class MainWindow : Window
                 _petOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture), _reminderMinutes.ToString(),
                 Convert.ToBase64String(Encoding.UTF8.GetBytes(_reminderText)),
                 _savedLeft.ToString(System.Globalization.CultureInfo.InvariantCulture), _savedTop.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                _experimentalModel.ToString()
+                _experimentalModel.ToString(), _aiProviderIndex.ToString(), _speechProviderIndex.ToString()
             };
             File.WriteAllLines(tempPath, values);
             File.Move(tempPath, _settingsPath, true);

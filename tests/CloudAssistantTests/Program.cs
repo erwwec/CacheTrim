@@ -171,6 +171,21 @@ using (var stopAuto = new CancellationTokenSource())
     catch (OperationCanceledException) { Check(true, "stop cancels the automatic-action delay"); }
 }
 
+// OpenRouter is a separate fixed endpoint and exclusively the free router in all modes.
+mock.Responses.Enqueue("{\"choices\":[{\"message\":{\"content\":\"Привет\"}}]}");
+await CloudAssistant.AskAsync(client, "router-test-key", "Привет", (n, a, c) => Task.FromResult("unused"), CancellationToken.None, null, AiProvider.OpenRouter);
+var routerChat = JsonDocument.Parse(mock.Bodies[^1]).RootElement;
+Check(mock.Targets[^1] == "https://openrouter.ai/api/v1/chat/completions" && routerChat.GetProperty("model").GetString() == "openrouter/free" && routerChat.TryGetProperty("max_tokens", out _) && !routerChat.TryGetProperty("max_completion_tokens", out _), "OpenRouter free chat endpoint and compatible token field");
+Check(mock.Auth[^1] == "Bearer router-test-key", "only selected provider key sent to selected fixed endpoint");
+mock.Responses.Enqueue("{\"choices\":[{\"message\":{\"content\":\"Вижу экран\"}}]}");
+await ScreenVision.AskAsync(client, "router-test-key", "Что видно?", new byte[] { 1 }, CancellationToken.None, AiProvider.OpenRouter);
+Check(mock.Targets[^1] == "https://openrouter.ai/api/v1/chat/completions" && JsonDocument.Parse(mock.Bodies[^1]).RootElement.GetProperty("model").GetString() == "openrouter/free", "OpenRouter vision uses free router");
+mock.Responses.Enqueue(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = "{\"action\":\"done\",\"reason\":\"готово\"}" } } } }));
+await ComputerAgent.NextAsync(client, "router-test-key", "задача", Array.Empty<string>(), new byte[] { 1 }, CancellationToken.None, AiProvider.OpenRouter);
+var routerControl = JsonDocument.Parse(mock.Bodies[^1]).RootElement;
+Check(mock.Targets[^1] == "https://openrouter.ai/api/v1/chat/completions" && routerControl.GetProperty("model").GetString() == "openrouter/free" && !routerControl.TryGetProperty("reasoning_effort", out _), "OpenRouter computer control uses free router and compatible fields");
+try { AiProviderConfig.Endpoint((AiProvider)999); throw new Exception("unknown provider accepted"); } catch (ArgumentOutOfRangeException) { Check(true, "unknown endpoint rejected"); }
+
 Console.WriteLine("All cloud assistant tests passed.");
 
 sealed class FakeHandler : HttpMessageHandler
@@ -178,9 +193,10 @@ sealed class FakeHandler : HttpMessageHandler
     public Queue<string> Responses { get; } = new();
     public List<string> Targets { get; } = new();
     public List<string> Bodies { get; } = new();
+    public List<string> Auth { get; } = new();
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested(); Targets.Add(request.RequestUri!.ToString());
+        ct.ThrowIfCancellationRequested(); Targets.Add(request.RequestUri!.ToString()); Auth.Add(request.Headers.Authorization?.ToString() ?? "");
         Bodies.Add(await request.Content!.ReadAsStringAsync(ct));
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Responses.Dequeue()) };
     }

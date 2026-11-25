@@ -17,6 +17,31 @@ public partial class MainWindow
     private bool _screenRequest;
     private bool _computerStopListening;
     private readonly ConversationHistory _conversation = new();
+    private int _aiProviderIndex, _speechProviderIndex;
+    private AiProvider SelectedAiProvider => _aiProviderIndex == 1 ? AiProvider.OpenRouter : AiProvider.Groq;
+    private bool LocalSpeech => _speechProviderIndex == 0;
+    private static string KeyPath(AiProvider p) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeDesktopPet", p switch { AiProvider.Groq => "groq-key.dat", AiProvider.OpenRouter => "openrouter-key.dat", _ => throw new ArgumentOutOfRangeException(nameof(p)) });
+    private static string LoadKey(AiProvider p)
+    {
+        try { return Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(KeyPath(p)), null, DataProtectionScope.CurrentUser)); }
+        catch { throw new InvalidOperationException("Сначала сохрани ключ " + AiProviderConfig.Name(p) + " в настройках."); }
+    }
+    private void AssistantProvider_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_initializing || AssistantProvider == null || AssistantSpeechProvider == null || AssistantKeyLabel == null) return;
+        _aiProviderIndex = AssistantProvider.SelectedIndex == 1 ? 1 : 0;
+        _speechProviderIndex = AssistantSpeechProvider.SelectedIndex == 1 ? 1 : 0;
+        AssistantApiKey.Clear();
+        AssistantKeyLabel.Text = "Ключ " + AiProviderConfig.Name(SelectedAiProvider);
+        _conversation.Clear();
+        AssistantCloudStatus.Text = "Настройки сохранены. При смене ИИ история очищена.";
+        SaveSettings();
+    }
+    private async Task<string> TranscribeAsync(byte[] audio, bool local, string? groqKey, CancellationToken ct)
+    {
+        if (local) return await OfflineSpeech.TranscribeAsync(audio, ct);
+        return await CloudSpeech.TranscribeAsync(CloudHttp, groqKey!, audio, ct);
+    }
 
     private void AssistantContext_Changed(object sender, RoutedEventArgs e)
     {
@@ -38,22 +63,24 @@ public partial class MainWindow
     {
         bool listening = _voiceSession != null || _wakeSession != null || _computerStopListening || (_cloudCancellation != null && _cloudRecorder != null);
         bool working = _cloudCancellation != null;
+        AssistantProvider.IsEnabled = !working && !_wakeEnabled;
+        AssistantSpeechProvider.IsEnabled = !working && !_wakeEnabled;
         AssistantBadge.Visibility = listening || working ? Visibility.Visible : Visibility.Collapsed;
         AssistantBadgeText.Text = _computerStopListening ? "● СТОП-МИКРОФОН + ЭКРАН → ИИ" : _wakeSession != null ? "● СЛУШАЮ ДЖАРВИС" : listening ? "● МИКРОФОН" : _screenRequest ? "● ЭКРАН → ИИ" : "● ИИ РАБОТАЕТ";
     }
-    private static string CloudKeyPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeDesktopPet", "groq-key.dat");
 
     private void SaveCloudKey_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
         var key = AssistantApiKey.Password.Trim();
-        if (key.Length < 8 || key.Length > 256 || key.Contains('\n') || key.Contains('\r')) { AssistantCloudStatus.Text = "Введи корректный ключ Groq."; return; }
+        string path = KeyPath(SelectedAiProvider);
+        if (key.Length < 8 || key.Length > 256 || key.Contains('\n') || key.Contains('\r')) { AssistantCloudStatus.Text = "Введи корректный ключ " + AiProviderConfig.Name(SelectedAiProvider) + "."; return; }
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(CloudKeyPath)!);
-            File.WriteAllBytes(CloudKeyPath, ProtectedData.Protect(Encoding.UTF8.GetBytes(key), null, DataProtectionScope.CurrentUser));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, ProtectedData.Protect(Encoding.UTF8.GetBytes(key), null, DataProtectionScope.CurrentUser));
             AssistantApiKey.Clear();
-            AssistantCloudStatus.Text = "Ключ сохранён для этой учётной записи Windows. Проверь, что тариф Groq бесплатный.";
+            AssistantCloudStatus.Text = "Ключ сохранён для этой учётной записи Windows: " + AiProviderConfig.Name(SelectedAiProvider) + ".";
         }
         catch { AssistantCloudStatus.Text = "Не удалось сохранить ключ в защищённом хранилище Windows."; }
     }
@@ -61,7 +88,7 @@ public partial class MainWindow
     {
         if (!_experimentalModel || _isClosing) return;
         StopCloud(); DisableWakeWord();
-        try { File.Delete(CloudKeyPath); AssistantApiKey.Clear(); AssistantCloudStatus.Text = "Сохранённый ключ удалён с этого ПК."; }
+        try { File.Delete(KeyPath(SelectedAiProvider)); AssistantApiKey.Clear(); AssistantCloudStatus.Text = "Сохранённый ключ удалён с этого ПК."; }
         catch { AssistantCloudStatus.Text = "Не удалось удалить ключ."; }
     }
     private void StopCloud()
@@ -94,16 +121,17 @@ public partial class MainWindow
         if (_voiceSession != null) { AssistantCloudStatus.Text = "Сначала останови локальное прослушивание."; return; }
         string question = AssistantCloudText.Text.Trim();
         if (string.IsNullOrWhiteSpace(question)) { AssistantCloudStatus.Text = "Напиши, что посмотреть на экране."; return; }
+        var provider = SelectedAiProvider;
         string key;
-        try { key = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CloudKeyPath), null, DataProtectionScope.CurrentUser)); }
-        catch { AssistantCloudStatus.Text = "Сначала сохрани ключ бесплатного аккаунта Groq."; return; }
+        try { key = LoadKey(provider); }
+        catch (InvalidOperationException ex) { AssistantCloudStatus.Text = ex.Message; return; }
         var cts = new CancellationTokenSource();
         _cloudCancellation = cts;
         _screenRequest = true;
         UpdateAssistantBadge();
         AssistantCloudButton.Content = "Остановить запрос";
         AssistantScreenButton.Content = "Остановить просмотр";
-        AssistantCloudStatus.Text = "Делаю и отправляю снимок основного экрана в Groq…";
+        AssistantCloudStatus.Text = "Отправляю снимок основного экрана в " + AiProviderConfig.Name(provider) + "…";
         bool restoreAssistant = HideAssistantForScreenCapture();
         try
         {
@@ -112,13 +140,13 @@ public partial class MainWindow
             await Task.Delay(250, cts.Token);
             cts.Token.ThrowIfCancellationRequested();
             byte[] image = ScreenCapture.CapturePrimaryJpeg();
-            string answer = await ScreenVision.AskAsync(CloudHttp, key, question, image, cts.Token);
+            string answer = await ScreenVision.AskAsync(CloudHttp, key, question, image, cts.Token, provider);
             if (!ReferenceEquals(_cloudCancellation, cts) || _isClosing || !_experimentalModel) return;
             _reminderHoldUntil = DateTime.MinValue; _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
             ShowSpeech(answer); AssistantCloudStatus.Text = answer;
         }
         catch (OperationCanceledException) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = "Просмотр остановлен или истекло время ожидания."; }
-        catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось снять экран или связаться с Groq."; }
+        catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось снять экран или связаться с выбранным ИИ."; }
         finally
         {
             if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; _screenRequest = false; UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantScreenButton.Content = "Спросить ИИ об экране"; }
@@ -137,9 +165,11 @@ public partial class MainWindow
     }
     private async Task RunCloudAsync(string? question, bool recordVoice)
     {
-        string key;
-        try { key = Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CloudKeyPath), null, DataProtectionScope.CurrentUser)); }
-        catch { AssistantCloudStatus.Text = "Сначала сохрани ключ бесплатного аккаунта Groq."; return; }
+        var provider = SelectedAiProvider;
+        bool localSpeech = LocalSpeech;
+        string key; string? groqKey = null;
+        try { key = LoadKey(provider); if (recordVoice && !localSpeech) groqKey = LoadKey(AiProvider.Groq); }
+        catch (InvalidOperationException ex) { AssistantCloudStatus.Text = ex.Message; return; }
         var cts = new CancellationTokenSource();
         _cloudCancellation = cts;
         UpdateAssistantBadge();
@@ -159,13 +189,14 @@ public partial class MainWindow
                     finally { if (ReferenceEquals(_cloudRecorder, recorder)) { _cloudRecorder = null; UpdateAssistantBadge(); } }
                     if (!ReferenceEquals(_cloudCancellation, cts)) return;
                     AssistantCloudVoiceButton.Content = "Сказать задачу ИИ";
-                    AssistantCloudStatus.Text = "Отправляю голос в Groq для распознавания…";
-                    question = await CloudSpeech.TranscribeAsync(CloudHttp, key, audio, cts.Token);
+                    AssistantCloudStatus.Text = localSpeech ? "Распознаю речь локально…" : "Отправляю голос в Groq для распознавания…";
+                    question = await TranscribeAsync(audio, localSpeech, groqKey, cts.Token);
                     if (!ReferenceEquals(_cloudCancellation, cts)) return;
                     AssistantCloudText.Text = question;
+                    if (MessageBox.Show("Распознано:\n\n" + question + "\n\nОтправить выбранному ИИ?", "Проверь распознавание", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) throw new OperationCanceledException();
                 }
             }
-            AssistantCloudStatus.Text = "Запрос отправлен в Groq…";
+            AssistantCloudStatus.Text = "Запрос отправлен в " + AiProviderConfig.Name(provider) + "…";
             var history = AssistantContext.IsChecked == true ? _conversation.Snapshot() : null;
             var answer = await CloudAssistant.AskAsync(CloudHttp, key, question!, async (name, arguments, ct) =>
             {
@@ -218,14 +249,14 @@ public partial class MainWindow
                         return "Открыта папка загрузок.";
                     default: return "Действие недоступно.";
                 }
-            }, cts.Token, history);
+            }, cts.Token, history, provider);
             if (!ReferenceEquals(_cloudCancellation, cts) || _isClosing || !_experimentalModel) return;
             if (AssistantContext.IsChecked == true) _conversation.AddTurn(question!, answer);
             _reminderHoldUntil = DateTime.MinValue; _lyricsHoldUntil = DateTime.UtcNow.AddSeconds(8);
             ShowSpeech(answer); AssistantCloudStatus.Text = answer;
         }
         catch (OperationCanceledException) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = "Запрос остановлен или истекло время ожидания."; }
-        catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось связаться с Groq. Проверь интернет и ключ."; }
+        catch (Exception ex) { if (ReferenceEquals(_cloudCancellation, cts)) AssistantCloudStatus.Text = ex is InvalidOperationException ? ex.Message : "Не удалось связаться с выбранным ИИ. Проверь интернет и ключ."; }
         finally
         {
             if (ReferenceEquals(_cloudCancellation, cts)) { _cloudCancellation = null; UpdateAssistantBadge(); AssistantCloudButton.Content = "Спросить ИИ"; AssistantCloudVoiceButton.Content = "Сказать задачу ИИ"; }

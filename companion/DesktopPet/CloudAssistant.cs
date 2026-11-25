@@ -23,7 +23,7 @@ internal static class CloudAssistant
 
     internal static async Task<string> AskAsync(HttpClient client, string key, string question,
         Func<string, string, CancellationToken, Task<string>> execute, CancellationToken ct,
-        IReadOnlyList<ConversationMessage>? history = null)
+        IReadOnlyList<ConversationMessage>? history = null, AiProvider provider = AiProvider.Groq)
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(question) || question.Length > 1000)
             throw new ArgumentException("Нужны ключ и запрос до 1000 символов.");
@@ -73,7 +73,7 @@ internal static class CloudAssistant
                     }
                 }, ["required"] = new JsonArray("title", "subtitle", "slides") }
         }});
-        var first = await SendAsync(client, key, messages, tools, ct);
+        var first = await SendAsync(client, key, messages, tools, ct, provider);
         if (first["tool_calls"] is not JsonArray calls || calls.Count == 0)
             return GetText(first);
         if (calls.Count > 3) throw new InvalidOperationException("Слишком много действий в одном запросе; попробуй разделить задачу.");
@@ -95,7 +95,7 @@ internal static class CloudAssistant
             messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = id, ["name"] = name ?? "unknown", ["content"] = result });
         }
         ct.ThrowIfCancellationRequested();
-        return GetText(await SendAsync(client, key, messages, null, ct));
+        return GetText(await SendAsync(client, key, messages, null, ct, provider));
     }
 
     internal static bool IsAllowedCall(string? name, string? args)
@@ -134,17 +134,17 @@ internal static class CloudAssistant
         string? content = message["content"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(content) ? "ИИ не вернул текст. Попробуй ещё раз." : content.Trim()[..Math.Min(content.Trim().Length, 800)];
     }
-    private static async Task<JsonNode> SendAsync(HttpClient client, string key, JsonArray messages, JsonArray? tools, CancellationToken ct)
+    private static async Task<JsonNode> SendAsync(HttpClient client, string key, JsonArray messages, JsonArray? tools, CancellationToken ct, AiProvider provider)
     {
-        var body = new JsonObject { ["model"] = "openai/gpt-oss-20b", ["messages"] = messages.DeepClone(), ["max_completion_tokens"] = 3072 };
+        var body = AiProviderConfig.Body(provider, (JsonArray)messages.DeepClone(), false, 3072);
         if (tools != null) { body["tools"] = tools; body["tool_choice"] = "auto"; }
-        using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+        using var req = new HttpRequestMessage(HttpMethod.Post, AiProviderConfig.Endpoint(provider));
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var res = await client.SendAsync(req, ct);
-        if (res.StatusCode == HttpStatusCode.TooManyRequests) throw new InvalidOperationException("Лимит Groq исчерпан. Попробуй позже.");
-        if (res.StatusCode == HttpStatusCode.Unauthorized || res.StatusCode == HttpStatusCode.Forbidden) throw new InvalidOperationException("Ключ Groq не принят или модель недоступна для аккаунта.");
-        if (!res.IsSuccessStatusCode) throw new InvalidOperationException("Сервис Groq недоступен или отклонил запрос (HTTP " + (int)res.StatusCode + ").");
+        if (res.StatusCode == HttpStatusCode.TooManyRequests) throw new InvalidOperationException("Лимит " + AiProviderConfig.Name(provider) + " исчерпан. Попробуй позже.");
+        if (res.StatusCode == HttpStatusCode.Unauthorized || res.StatusCode == HttpStatusCode.Forbidden) throw new InvalidOperationException("Ключ " + AiProviderConfig.Name(provider) + " не принят или модель недоступна для аккаунта.");
+        if (!res.IsSuccessStatusCode) throw new InvalidOperationException("Сервис " + AiProviderConfig.Name(provider) + " недоступен или отклонил запрос (HTTP " + (int)res.StatusCode + ").");
         string json = await res.Content.ReadAsStringAsync(ct);
         if (json.Length > 262144) throw new InvalidOperationException("Ответ сервиса слишком большой.");
         var root = JsonNode.Parse(json);

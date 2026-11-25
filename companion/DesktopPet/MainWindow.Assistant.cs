@@ -55,6 +55,11 @@ public partial class MainWindow
         }
     }
 
+    private void AssistantCommandSelector_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (AssistantCommandSelector.SelectedItem is string phrase) AssistantCommandText.Text = phrase;
+    }
+
     private void AssistantText_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;

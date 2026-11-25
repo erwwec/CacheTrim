@@ -13,6 +13,10 @@ internal static class VoskNative
     private static extern void ModelFree(IntPtr model);
     [DllImport("libvosk", EntryPoint = "vosk_model_find_word", CallingConvention = CallingConvention.Cdecl)]
     internal static extern int FindWord(ModelHandle model, [MarshalAs(UnmanagedType.LPUTF8Str)] string word);
+    [DllImport("libvosk", EntryPoint = "vosk_recognizer_new", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr RecognizerNewFull(ModelHandle model, float rate);
+    [DllImport("libvosk", EntryPoint = "vosk_recognizer_final_result", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr FinalResultPtr(RecognizerHandle recognizer);
     [DllImport("libvosk", EntryPoint = "vosk_recognizer_new_grm", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr RecognizerNew(ModelHandle model, float rate, [MarshalAs(UnmanagedType.LPUTF8Str)] string grammar);
     [DllImport("libvosk", EntryPoint = "vosk_recognizer_free", CallingConvention = CallingConvention.Cdecl)]
@@ -49,6 +53,13 @@ internal static class VoskNative
         if (handle.IsInvalid) { handle.Dispose(); throw new InvalidOperationException("Не удалось запустить голосовое распознавание."); }
         return handle;
     }
+    internal static RecognizerHandle CreateFull(ModelHandle model)
+    {
+        var handle = new RecognizerHandle(RecognizerNewFull(model, 16000));
+        if (handle.IsInvalid) { handle.Dispose(); throw new InvalidOperationException("Не удалось запустить локальное распознавание."); }
+        return handle;
+    }
+    internal static string FinalResult(RecognizerHandle recognizer) => Marshal.PtrToStringUTF8(FinalResultPtr(recognizer)) ?? "{}";
     internal static string Result(RecognizerHandle recognizer, bool final) =>
         Marshal.PtrToStringUTF8(final ? ResultPtr(recognizer) : PartialPtr(recognizer)) ?? "{}";
 }

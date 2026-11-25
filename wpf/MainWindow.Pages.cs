@@ -105,7 +105,7 @@ public partial class MainWindow
             try { await RestartCompanionAsync(choice.SelectedIndex == 1, experimental: choice.SelectedIndex == 2); }
             finally { launch.IsEnabled = restart.IsEnabled = choice.IsEnabled = true; }
         });
-        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Обычный Клод и Клод V2 — разные модели одного питомца. В V2 есть простые команды и первый этап облачного помощника с ключом Groq; модель пока имеет одну позу. Если Клод уже запущен, выбери модель в его меню или нажми «Перезапустить выбранного». При первом запуске нужен интернет; аниме-аватар входит в обновление.", choice, launch, restart));
+        cards.Children.Add(AdvancedModule("ВЫБОР КОМПАНЬОНА", "Обычный Клод и Клод V2 — разные модели одного питомца. В V2 есть простые команды и облачный помощник через Groq или бесплатные модели OpenRouter и локальное распознавание русской речи; модель пока имеет одну позу. Если Клод уже запущен, выбери модель в его меню или нажми «Перезапустить выбранного». При первом запуске нужен интернет; аниме-аватар входит в обновление.", choice, launch, restart));
         cards.Children.Add(AdvancedModule("УПРАВЛЕНИЕ КЛОДОМ", "Клод: перетаскивай левой кнопкой мыши; правой открывай меню, включая настройки песен. У аниме-аватара своё меню.",
             AdvancedButton("Как настроить Клода", async () => await ShowPetHelpAsync()),
             AdvancedButton("Об аниме-аватаре", ShowAnimeAvatarNotices)));

@@ -61,7 +61,7 @@ internal static class ComputerAgent
         { throw new InvalidOperationException("ИИ предложил непонятное действие. Задача остановлена."); }
     }
 
-    internal static async Task<ComputerStep> NextAsync(HttpClient client, string key, string goal, IReadOnlyList<string> previous, byte[] jpeg, CancellationToken ct)
+    internal static async Task<ComputerStep> NextAsync(HttpClient client, string key, string goal, IReadOnlyList<string> previous, byte[] jpeg, CancellationToken ct, AiProvider provider = AiProvider.Groq)
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(goal) || goal.Length > 1000 || jpeg.Length == 0 || jpeg.Length > 4 * 1024 * 1024 || previous.Count > MaxSteps)
             throw new ArgumentException("Некорректная задача или снимок экрана.");
@@ -71,15 +71,17 @@ internal static class ComputerAgent
             new JsonObject { ["role"] = "user", ["content"] = new JsonArray(
                 new JsonObject { ["type"] = "text", ["text"] = "User goal: " + goal + "\nPreviously attempted (not proof of success):\n" + summary + "\nReturn a JSON object with the next single action based on this screenshot." },
                 new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = "data:image/jpeg;base64," + Convert.ToBase64String(jpeg) } }) });
-        var body = new JsonObject { ["model"] = "qwen/qwen3.8-27b", ["messages"] = messages, ["response_format"] = new JsonObject { ["type"] = "json_object" }, ["reasoning_effort"] = "none", ["max_completion_tokens"] = 1024 };
-        using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+        var body = AiProviderConfig.Body(provider, messages, true, 1024);
+        body["response_format"] = new JsonObject { ["type"] = "json_object" };
+        if (provider == AiProvider.Groq) body["reasoning_effort"] = "none";
+        using var req = new HttpRequestMessage(HttpMethod.Post, AiProviderConfig.Endpoint(provider));
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var res = await client.SendAsync(req, ct);
-        if (res.StatusCode == HttpStatusCode.TooManyRequests) throw new InvalidOperationException("Лимит Groq исчерпан.");
-        if (!res.IsSuccessStatusCode) throw new InvalidOperationException("Groq не обработал снимок (HTTP " + (int)res.StatusCode + ").");
+        if (res.StatusCode == HttpStatusCode.TooManyRequests) throw new InvalidOperationException("Лимит " + AiProviderConfig.Name(provider) + " исчерпан.");
+        if (!res.IsSuccessStatusCode) throw new InvalidOperationException(AiProviderConfig.Name(provider) + " не обработал снимок (HTTP " + (int)res.StatusCode + ").");
         string json = await res.Content.ReadAsStringAsync(ct);
-        if (json.Length > 262144) throw new InvalidOperationException("Ответ Groq слишком большой.");
+        if (json.Length > 262144) throw new InvalidOperationException("Ответ сервиса слишком большой.");
         string? content = JsonNode.Parse(json)?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         return Parse(content ?? "");
     }
