@@ -21,6 +21,8 @@ internal sealed class UpdateInfo
     public bool Available { get; init; }
 }
 
+internal readonly record struct UpdateDownloadProgress(long DownloadedBytes, long? TotalBytes, bool Verifying);
+
 internal static class UpdateService
 {
     private static readonly HttpClient Client = new();
@@ -92,7 +94,7 @@ internal static class UpdateService
         };
     }
 
-    public static void DownloadAndLaunch(UpdateInfo update, string targetExe, int processId)
+    public static void DownloadAndLaunch(UpdateInfo update, string targetExe, int processId, IProgress<UpdateDownloadProgress>? progress = null)
     {
         if (update is null || !update.Available)
             throw new InvalidOperationException("Нет доступного обновления.");
@@ -117,21 +119,11 @@ internal static class UpdateService
                 throw new InvalidDataException("Файл обновления превышает допустимый размер.");
             using Stream source = response.Content.ReadAsStream();
             using FileStream output = new(stagedExe, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 256);
-            using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            byte[] buffer = new byte[1024 * 256];
-            int read;
-            long total = 0;
-            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
-            {
-                total += read;
-                if (total > MaxAppUpdateBytes) throw new InvalidDataException("Файл обновления превышает допустимый размер.");
-                output.Write(buffer, 0, read);
-                hash.AppendData(buffer, 0, read);
-            }
+            actual = CopyUpdateStream(source, output, response.Content.Headers.ContentLength, MaxAppUpdateBytes, progress);
             output.Flush(true);
             if (output.Length < 4096)
                 throw new InvalidDataException("Загруженный файл слишком мал для исполняемого файла Windows.");
-            actual = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+            progress?.Report(new UpdateDownloadProgress(output.Length, null, true));
         }
         catch
         {
@@ -215,6 +207,34 @@ internal static class UpdateService
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden
         }) ?? throw new InvalidOperationException("Не удалось запустить установщик обновления.");
+    }
+
+    // Progress describes downloaded bytes, not installation or verification progress.
+    internal static string CopyUpdateStream(Stream source, Stream output, long? contentLength, long maxBytes, IProgress<UpdateDownloadProgress>? progress)
+    {
+        long? expected = contentLength > 0 && contentLength <= maxBytes ? contentLength : null;
+        using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[1024 * 256];
+        long total = 0;
+        var timer = Stopwatch.StartNew();
+        progress?.Report(new UpdateDownloadProgress(0, expected, false));
+        int read;
+        while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            total += read;
+            if (total > maxBytes) throw new InvalidDataException("Файл обновления превышает допустимый размер.");
+            if (expected.HasValue && total > expected.Value) expected = null;
+            output.Write(buffer, 0, read);
+            hash.AppendData(buffer, 0, read);
+            if (timer.ElapsedMilliseconds >= 150)
+            {
+                progress?.Report(new UpdateDownloadProgress(total, expected, false));
+                timer.Restart();
+            }
+        }
+        if (expected.HasValue && total != expected.Value) expected = null;
+        progress?.Report(new UpdateDownloadProgress(total, expected, false));
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
     public static string EnsureDesktopPet(UpdateInfo update, string trustedHash)
