@@ -20,12 +20,12 @@ public partial class MainWindow
         if (!_experimentalModel || _isClosing) return;
         if (_cloudCancellation != null) { AssistantCloudStatus.Text = "Сначала останови текущий запрос."; return; }
         if (_voiceSession != null) { AssistantCloudStatus.Text = "Сначала останови прослушивание."; return; }
-        // CacheTrim normally runs elevated. Never grant experimental control its admin token.
+        // Explicitly warn before using an elevated token; failed privilege detection is closed.
+        bool elevated;
         try
         {
             using var identity = WindowsIdentity.GetCurrent();
-            if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
-            { AssistantCloudStatus.Text = "Управление запрещено из программы с правами администратора. Запусти DesktopPet.exe напрямую без администратора и выбери Клод V2."; return; }
+            elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         }
         catch { AssistantCloudStatus.Text = "Не удалось проверить права процесса; управление заблокировано."; return; }
         bool automatic = AssistantAutoControl.IsChecked == true;
@@ -41,7 +41,7 @@ public partial class MainWindow
         string modeWarning = automatic
             ? "АВТОМАТИЧЕСКИЙ РЕЖИМ: после запуска ИИ будет нажимать, вводить текст и запускать приложения без подтверждения каждого шага. Он может ошибиться, изменить или отправить данные. Фильтр опасных действий НЕ надёжен. Следи за работой и используй кнопку остановки. "
             : "Каждый шаг потребует подтверждения. ";
-        var consent = fromWake ? MessageBoxResult.Yes : MessageBox.Show((recordVoice ? (localSpeech ? "Речь распознаётся локально. " : "Голосовая запись до 15 секунд будет отправлена в Groq для распознавания. ") : "") + "На каждом шаге снимок ОСНОВНОГО экрана целиком будет отправлен в " + providerName + ", включая видимые личные данные. " + modeWarning + (voiceStop ? "Во время задачи микрофон непрерывно слушает команды «стоп» через локальный Vosk; аудио этого режима приложение в Groq не отправляет. Голосовая остановка может не сработать. " : "Голосовая остановка выключена; доступна кнопка. ") + "Не используй пароли, коды или платёжные данные. Закрой лишние окна. Продолжить?", "Управление компьютером", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var consent = fromWake ? MessageBoxResult.Yes : MessageBox.Show(ComputerSafety.AdministratorWarning(elevated) + (recordVoice ? (localSpeech ? "Речь распознаётся локально. " : "Голосовая запись до 15 секунд будет отправлена в Groq для распознавания. ") : "") + "На каждом шаге снимок ОСНОВНОГО экрана целиком будет отправлен в " + providerName + ", включая видимые личные данные. " + modeWarning + (voiceStop ? "Во время задачи микрофон непрерывно слушает команды «стоп» через локальный Vosk; аудио этого режима приложение в Groq не отправляет. Голосовая остановка может не сработать. " : "Голосовая остановка выключена; доступна кнопка. ") + "Не используй пароли, коды или платёжные данные. Закрой лишние окна. Продолжить?", "Управление компьютером", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (consent != MessageBoxResult.Yes) return;
         var cts = new CancellationTokenSource(); _cloudCancellation = cts; UpdateAssistantBadge();
         var panel = new ComputerControlPanel(() => { if (!cts.IsCancellationRequested) cts.Cancel(); });

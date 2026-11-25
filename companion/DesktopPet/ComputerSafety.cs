@@ -19,5 +19,8 @@ internal static class ComputerSafety
             if (text.Contains(token, StringComparison.OrdinalIgnoreCase)) return true;
         return false;
     }
+    internal static string AdministratorWarning(bool elevated) => elevated
+        ? "ВНИМАНИЕ: Клод запущен с правами АДМИНИСТРАТОРА. ИИ может менять или удалять системные файлы и настройки, устанавливать программы и затронуть весь компьютер. Ошибки могут привести к потере данных. Для меньшего риска запусти питомца без администратора. "
+        : "";
     internal static Task WaitBeforeAutomaticAction(CancellationToken ct) => Task.Delay(TimeSpan.FromSeconds(3), ct);
 }
