@@ -51,6 +51,7 @@ internal static class Program
             Check(entry.Background.ToString() == "#FF30263C" && entry.Template.FindName("PART_ContentHost", entry) != null, "input has a dark editable template");
             providers.ApplyTemplate();
             Check(providers.Template.FindName("PART_Popup", providers) != null, "provider menu has a dropdown");
+            Check(((System.Windows.Controls.Button)Element("OpenOpenRouterKeysButton")).Content.ToString()!.Contains("OpenRouter") && ((System.Windows.Controls.Button)Element("OpenGroqKeysButton")).Content.ToString()!.Contains("Groq"), "both API key help links are present");
             assistantWindow.Close();
             Check(!assistantWindow.IsVisible, "closing assistant hides it safely");
             Check(sprite.Source != null && !ReferenceEquals(sprite.Source, classic), "test model is distinct from the original");
