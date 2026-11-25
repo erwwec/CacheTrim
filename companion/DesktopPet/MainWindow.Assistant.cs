@@ -12,12 +12,14 @@ public partial class MainWindow
         try { old?.Dispose(); } catch (Exception) { /* shutdown must remain safe */ }
         AssistantListenButton.Content = "Слушать одну команду";
         AssistantVoiceStatus.Text = "Микрофон выключен";
+        UpdateAssistantBadge();
     }
 
     private void AssistantListen_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
         if (_voiceSession != null) { StopVoice(); return; }
+        if (_cloudCancellation != null) { AssistantVoiceStatus.Text = "Сначала останови облачный запрос."; return; }
         if (MessageBox.Show(this,
             "Включить микрофон для одной команды? Постоянного прослушивания нет. CacheTrim не сохраняет и не отправляет запись; обработка зависит от установленного модуля Windows.",
             "Голосовые команды Клода V2", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
@@ -39,6 +41,7 @@ public partial class MainWindow
                 })); } catch (InvalidOperationException) { }
             });
             _voiceSession = session;
+            UpdateAssistantBadge();
             AssistantVoiceStatus.Text = "Слушаю одну команду…";
             AssistantListenButton.Content = "Остановить прослушивание";
             session.Start();

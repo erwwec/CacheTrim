@@ -22,6 +22,9 @@
                    Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
                    MouseLeftButtonDown="Pet_MouseLeftButtonDown" MouseMove="Pet_MouseMove"
                    MouseLeftButtonUp="Pet_MouseLeftButtonUp" MouseRightButtonUp="Pet_MouseRightButtonUp" />
+            <Border x:Name="AssistantBadge" Canvas.Left="65" Canvas.Top="157" Background="#ED361D2C" CornerRadius="6" Padding="7,3" Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="AssistantBadgeText" Foreground="#FFFFC3CE" FontSize="11" FontWeight="Bold" />
+            </Border>
             <TextBlock x:Name="PropGlyph" Canvas.Left="155" Canvas.Top="243" FontSize="17" Visibility="Collapsed" />
         </Canvas>
         <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=PetSprite}" Placement="Top"
@@ -118,12 +121,23 @@
                     </Expander>
                     <Expander x:Name="AssistantSection" Header="Помощник · Клод V2" Visibility="Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Простые команды, не ИИ-чат. Микрофон включается только по кнопке на одну команду." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,6" />
+                            <TextBlock Text="Быстрые локальные команды. Микрофон включается только на одну команду." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,3,0,6" />
                             <Button x:Name="AssistantListenButton" Content="Слушать одну команду" Click="AssistantListen_Click" />
                             <TextBlock x:Name="AssistantVoiceStatus" Text="Микрофон выключен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,5" />
                             <TextBox x:Name="AssistantCommandText" MaxLength="80" Margin="0,2,0,4" ToolTip="Введи команду из списка ниже" />
                             <Button Content="Выполнить текстовую команду" Click="AssistantText_Click" />
                             <TextBlock Text="Команды: привет Клод; который час; сколько времени; какое сегодня число; прыгни; принеси секрет; открой загрузки; покажи рабочий стол." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,5,0,2" />
+                            <TextBlock Text="Облачный ИИ · Groq" FontWeight="SemiBold" Foreground="#FFF7F1FC" Margin="0,12,0,4" />
+                            <TextBlock Text="Запрос отправляется в Groq. Используй ключ бесплатного тарифа: платные аккаунты могут списывать деньги. Ключ хранится защищённым Windows, не передавай его друзьям." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,5" />
+                            <PasswordBox x:Name="AssistantApiKey" MaxLength="256" ToolTip="Ключ Groq" Margin="0,2,0,4" />
+                            <Button Content="Сохранить ключ Groq" Click="SaveCloudKey_Click" />
+                            <Button Content="Удалить сохранённый ключ" Click="DeleteCloudKey_Click" />
+                            <TextBox x:Name="AssistantCloudText" MaxLength="1000" Height="56" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Напиши задачу" Margin="0,6,0,4" />
+                            <TextBlock Text="Голос: запись до 15 секунд отправляется в Groq для распознавания. Постоянного прослушивания нет." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
+                            <Button x:Name="AssistantCloudVoiceButton" Content="Сказать задачу ИИ" Click="CloudVoice_Click" />
+                            <Button x:Name="AssistantCloudButton" Content="Спросить ИИ" Click="AskCloud_Click" />
+                            <TextBlock x:Name="AssistantCloudStatus" Text="ИИ не запущен" Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4,0,4" />
+                            <TextBlock Text="Пока ИИ может открыть YouTube и загрузки, назвать время, прыгнуть или принести секрет. Он не видит экран и не выбирает видео." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,2,0,4" />
                         </StackPanel>
                     </Expander>
                     <Expander x:Name="BehaviorSection" Header="Поведение и секреты">
