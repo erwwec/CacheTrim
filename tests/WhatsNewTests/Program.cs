@@ -24,6 +24,19 @@ internal static class Program
         Check(history.IndexOf("восемь") < history.IndexOf("семь") && history.IndexOf("семь") < history.IndexOf("шесть"), "newest first");
         Check(ReleaseHistory.Format(releases, "2.5", "2.10") == null, "missing current release does not claim complete history");
         Check(ReleaseHistory.Format(releases, "invalid", "2.8") == null, "invalid version fallback");
+        using var sample = System.Text.Json.JsonDocument.Parse("""
+        [
+          {"tag_name":"v2.9", "body":"nine", "draft":false, "prerelease":false, "published_at":"2026-11-24T12:00:00Z"},
+          {"tag_name":"v2.10", "body":null, "draft":false, "prerelease":false},
+          {"tag_name":"v3.0", "body":"draft", "draft":true, "prerelease":false},
+          {"tag_name":"v2.11", "body":"beta", "draft":false, "prerelease":true},
+          {"tag_name":"unversioned", "body":"invalid", "draft":false, "prerelease":false}
+        ]
+        """);
+        var page = ReleaseHistory.SortReleases(ReleaseHistory.ReadPage(sample.RootElement));
+        Check(page.Count == 2, "history excludes drafts, prereleases and nonnumeric tags");
+        Check(page[0].Version == "v2.10" && page[1].Version == "v2.9", "all history sorted numerically, newest first");
+        Check(page[0].Notes == "" && page[1].Notes == "nine" && page[1].PublishedAt.HasValue, "empty notes and release date handled");
         Check(WhatsNewState.IsOlderVersion("2.1.12.0", "2.1.13"), "older version");
         Check(!WhatsNewState.IsOlderVersion("2.1.13.0", "2.1.13.0"), "same version");
         Check(!WhatsNewState.IsOlderVersion("invalid", "2.1.13"), "invalid version");

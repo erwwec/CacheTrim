@@ -101,10 +101,12 @@
                         <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,0">
                             <TextBlock x:Name="AdminText" Text="АДМИНИСТРАТОР" FontSize="10" FontWeight="SemiBold" />
                         </StackPanel>
-                        <StackPanel>
-                            <Button Content="Поиск функций · Ctrl+F" Margin="3,0,3,10" Padding="8,6" Click="OpenSearch_Click" />
-                            <StackPanel x:Name="NavigationItems" />
-                        </StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <Button Content="Поиск функций · Ctrl+F" Margin="3,0,3,10" Padding="8,6" Click="OpenSearch_Click" />
+                                <StackPanel x:Name="NavigationItems" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </DockPanel>
                 </Border>
                 <Grid Grid.Column="1">
