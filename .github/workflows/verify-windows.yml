@@ -62,6 +62,11 @@ jobs:
         run: |
           dotnet run --project .\tests\SystemInsightsTests\SystemInsightsTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'System insights checks failed' }
+      - name: Test process safety boundaries
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\ProcessManagerTests\ProcessManagerTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Process safety checks failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
