@@ -67,6 +67,7 @@ public partial class MainWindow : Window
     private double _phase;
     private double _uiScale = 0.5;
     private Point _dragOffset;
+    private IntPtr _dragStartMonitor;
     private Point _lastPointer;
     private DateTime _lastPointerAt;
     private bool _audioEnabled = true;
@@ -693,11 +694,12 @@ public partial class MainWindow : Window
         _miniSceneActive = false;
         _dragOffset = e.GetPosition(this);
         _lastPointer = PointToScreen(_dragOffset);
+        _dragStartMonitor = MonitorAt(_lastPointer);
         _lastPointerAt = DateTime.UtcNow;
         _velocityX = 0;
         _velocityY = 0;
         _onSurface = false;
-        element.CaptureMouse();
+        if (!element.CaptureMouse()) { _dragging = false; _velocityX = _velocityY = 0; }
         e.Handled = true;
     }
 
@@ -726,16 +728,35 @@ public partial class MainWindow : Window
     private void Pet_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_dragging) return;
+        var pointer = PointToScreen(e.GetPosition(this));
+        var destination = MonitorAt(pointer);
+        bool sameMonitor = _dragStartMonitor != IntPtr.Zero && _dragStartMonitor == destination;
+        bool keepThrow = PetPolicy.KeepThrow(sameMonitor, DateTime.UtcNow - _lastPointerAt);
         _dragging = false;
         ((UIElement)sender).ReleaseMouseCapture();
-        _velocityX = Math.Clamp(_velocityX * 1.6, -2800, 2800);
-        _velocityY = Math.Clamp(_velocityY * 1.6, -2800, 2800);
+        if (keepThrow)
+        {
+            _velocityX = Math.Clamp(_velocityX * 1.6, -2800, 2800);
+            _velocityY = Math.Clamp(_velocityY * 1.6, -2800, 2800);
+        }
+        else _velocityX = _velocityY = 0;
+        // The cursor identifies the destination even if the transparent HWND straddles screens.
+        ConstrainToMonitor(destination);
+        Dispatcher.BeginInvoke(new Action(() => { if (!_dragging && !_isClosing && IsLoaded) ConstrainToMonitor(destination); }), System.Windows.Threading.DispatcherPriority.Loaded);
         _forcedRoamingAfterThrow = true;
         _thrownResting = true;
         _throwHoldUntil = DateTime.UtcNow.AddSeconds(6);
         _miniSceneActive = false;
         ScheduleNextLeap(DateTime.UtcNow);
         e.Handled = true;
+    }
+
+    private void Pet_LostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (!_dragging) return;
+        _dragging = false;
+        _velocityX = _velocityY = 0;
+        ConstrainToCurrentMonitor();
     }
 
     private void Pet_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
