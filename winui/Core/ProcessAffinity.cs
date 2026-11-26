@@ -24,21 +24,23 @@ internal static class ProcessAffinity
     {
         if (mask == 0 || (mask & ~available) != 0) throw new ArgumentException("Выбери хотя бы один доступный логический процессор.");
     }
-    internal static void Apply(ProcessManager.Entry entry, ulong mask)
+    internal static void Apply(ProcessManager.Entry entry, ulong mask) => Apply(entry, mask, BackupPath);
+    internal static void Apply(ProcessManager.Entry entry, ulong mask, string backupPath)
     {
         ProcessManager.WithCheckedProcess(entry, p =>
         {
             State state = Read(p); ValidateMask(mask, state.SystemMask);
-            SaveOriginal(BackupPath, entry, state.ProcessMask);
+            SaveOriginal(backupPath, entry, state.ProcessMask);
             p.ProcessorAffinity = unchecked((IntPtr)(long)mask);
             return 0;
         });
     }
-    internal static void Restore(ProcessManager.Entry entry)
+    internal static void Restore(ProcessManager.Entry entry) => Restore(entry, BackupPath);
+    internal static void Restore(ProcessManager.Entry entry, string backupPath)
     {
         ProcessManager.WithCheckedProcess(entry, p =>
         {
-            var backup = Load(BackupPath).FirstOrDefault(x => Matches(x, entry)) ?? throw new InvalidOperationException("Для этого запуска процесса сохранённой маски нет.");
+            var backup = Load(backupPath).FirstOrDefault(x => Matches(x, entry)) ?? throw new InvalidOperationException("Для этого запуска процесса сохранённой маски нет.");
             var state = Read(p); ValidateMask(backup.OriginalMask, state.SystemMask);
             p.ProcessorAffinity = unchecked((IntPtr)(long)backup.OriginalMask);
             return 0;
