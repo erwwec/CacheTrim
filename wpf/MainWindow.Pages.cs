@@ -68,10 +68,27 @@ public partial class MainWindow
         checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
         modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
 
+        modules.Children.Add(AdvancedModule("ВНЕШНИЕ БАТНИКИ: FLN TWEAKER", "Два сторонних скрипта открываются отдельно и только по кнопке. Они получают права администратора и изменяют Windows; точный откат не гарантирован. Windows Tweaker также предлагает удалить приложения и отключить защитные функции. Ознакомься с предупреждением до запуска.",
+            AdvancedButton("Открыть Explorer Tweaker", () => OpenBundledTweaker(BundledTweakerScripts.Script.Explorer)),
+            AdvancedButton("Открыть Windows Tweaker", () => OpenBundledTweaker(BundledTweakerScripts.Script.Windows))));
+
         modules.Children.Add(AdvancedModule("ОТЧЁТ ДЛЯ ПОМОЩИ", "Сохранит сводку Windows, памяти, дисков и включённых настроек CacheTrim. Отчёт остаётся на этом компьютере, личные пути и список программ не добавляются.",
             AdvancedButton("Сохранить системный отчёт", async () => await ExportSystemReportAsync())));
 
         _pageContent!.Children.Add(modules);
+    }
+
+    private void OpenBundledTweaker(BundledTweakerScripts.Script script)
+    {
+        bool windows = script == BundledTweakerScripts.Script.Windows;
+        string detail = windows
+            ? "Windows Tweaker может удалять приложения и компоненты для всех пользователей, отключать UAC и SmartScreen, менять параметры безопасности и шифрования. Пункт F применяет много изменений сразу; полного отката нет."
+            : "Explorer Tweaker меняет реестр и настройки Проводника и может принудительно перезапустить Проводник. Полного восстановления прежних значений может не быть.";
+        string message = "Это сторонний скрипт из предоставленного архива, он откроется в отдельном окне с правами администратора. Его безопасность и совместимость с твоей Windows не подтверждены.\n\n" + detail +
+            "\n\nОткрытие не применяет настройки автоматически: действия выбираются внутри самого скрипта. Перед изменениями создай резервную копию и точку восстановления. Открыть скрипт?";
+        if (MessageBox.Show(this, message, "Внешний скрипт — предупреждение", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        try { BundledTweakerScripts.Launch(script); App.Log("Открыт внешний скрипт: " + (windows ? "Windows Tweaker" : "Explorer Tweaker")); }
+        catch (Exception ex) { MessageBox.Show(this, "Не удалось открыть скрипт: " + ex.Message, "Внешний скрипт", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void ShowPet()
