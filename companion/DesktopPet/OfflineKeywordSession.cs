@@ -18,11 +18,12 @@ internal sealed class OfflineKeywordSession : IDisposable
     private readonly VoskNative.RecognizerHandle _recognizer;
     private readonly WaveInEvent _input;
     private int _finished, _disposed;
+    internal string[] SkippedOptionalPhrases { get; private set; } = Array.Empty<string>();
 
     internal OfflineKeywordSession(string[] phrases, Func<string?, bool> matches, Action<bool> callback)
         : this(phrases, matches, (matched, _) => callback(matched)) { }
 
-    internal OfflineKeywordSession(string[] phrases, Func<string?, bool> matches, Action<bool, string?> callback)
+    internal OfflineKeywordSession(string[] phrases, Func<string?, bool> matches, Action<bool, string?> callback, string[]? optionalPhrases = null)
     {
         _matches = matches; _callback = callback;
         string path = Path.Combine(AppContext.BaseDirectory, "VoiceModel", "vosk-model-small-ru-0.22");
@@ -34,7 +35,11 @@ internal sealed class OfflineKeywordSession : IDisposable
             // Reject incomplete/corrupted models instead of pretending a stop word can work.
             if (phrases.SelectMany(p => p.Split(' ', StringSplitOptions.RemoveEmptyEntries)).Distinct().Any(w => VoskNative.FindWord(_model, w) < 0))
                 throw new InvalidOperationException("В локальной модели отсутствуют нужные слова. Голосовой режим не запущен.");
-            string grammar = JsonSerializer.Serialize(phrases.Append("[unk]").ToArray(), new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            var optional = optionalPhrases ?? Array.Empty<string>();
+            var accepted = CustomCommands.SupportedVoicePhrases(optional, word => VoskNative.FindWord(_model, word) >= 0);
+            var acceptedSet = new System.Collections.Generic.HashSet<string>(accepted, StringComparer.OrdinalIgnoreCase);
+            SkippedOptionalPhrases = optional.Where(p => !acceptedSet.Contains(p)).ToArray();
+            string grammar = JsonSerializer.Serialize(phrases.Concat(accepted).Append("[unk]").Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
             _recognizer = VoskNative.Create(_model, grammar);
             try
             {

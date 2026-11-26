@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 
 namespace DesktopPet;
@@ -27,7 +28,8 @@ public partial class MainWindow
         VoiceCommandSession? session = null;
         try
         {
-            session = new VoiceCommandSession((text, confidence, error) =>
+            var customPhrases = _customCommands.Where(c => c.Enabled).SelectMany(c => c.Phrases).ToArray();
+            session = new VoiceCommandSession(customPhrases, (text, confidence, error) =>
             {
                 if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
                 try { Dispatcher.BeginInvoke(new Action(() =>
@@ -35,15 +37,14 @@ public partial class MainWindow
                     if (_isClosing || !_experimentalModel || !ReferenceEquals(_voiceSession, session)) return;
                     StopVoice();
                     if (error != null) { AssistantVoiceStatus.Text = error; return; }
-                    var command = VoiceCommandCatalog.Parse(text, confidence);
-                    if (command == PetVoiceCommand.None) { AssistantVoiceStatus.Text = "Команда не распознана. Попробуй ещё раз или введи текст."; return; }
-                    AssistantVoiceStatus.Text = "Распознано: " + text;
-                    ExecuteAssistantCommand(command);
+                    if (!TryRunLocalPhrase(text, confidence)) AssistantVoiceStatus.Text = "Команда не распознана. Попробуй ещё раз или введи текст.";
                 })); } catch (InvalidOperationException) { }
             });
             _voiceSession = session;
             UpdateAssistantBadge();
-            AssistantVoiceStatus.Text = "Слушаю одну команду…";
+            AssistantVoiceStatus.Text = session.IgnoredPhrases.Count > 0
+                ? "Слушаю. Некоторые свои фразы не поддерживаются голосовой моделью; их можно ввести текстом."
+                : "Слушаю одну команду…";
             AssistantListenButton.Content = "Остановить прослушивание";
             session.Start();
         }
@@ -63,10 +64,7 @@ public partial class MainWindow
     private void AssistantText_Click(object sender, RoutedEventArgs e)
     {
         if (!_experimentalModel || _isClosing) return;
-        var command = VoiceCommandCatalog.Parse(AssistantCommandText.Text);
-        if (command == PetVoiceCommand.None) { AssistantVoiceStatus.Text = "Нет такой команды. Выбери фразу из списка."; return; }
-        AssistantVoiceStatus.Text = "Команда выполнена.";
-        ExecuteAssistantCommand(command);
+        if (!TryRunLocalPhrase(AssistantCommandText.Text)) AssistantVoiceStatus.Text = "Нет такой команды. Выбери фразу из списка.";
     }
 
     private void ExecuteAssistantCommand(PetVoiceCommand command)

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace DesktopPet;
@@ -11,15 +12,17 @@ internal sealed class VoiceCommandSession : IDisposable
     private readonly Action<string?, float, string?> _completed;
     private Timer? _timeout;
     private int _finished;
-    public VoiceCommandSession(Action<string?, float, string?> completed)
+    public IReadOnlyList<string> IgnoredPhrases => _session.SkippedOptionalPhrases;
+    public VoiceCommandSession(string[] customPhrases, Action<string?, float, string?> completed)
     {
         _completed = completed;
-        _session = new OfflineKeywordSession(VoiceCommandCatalog.Phrases, text => VoiceCommandCatalog.Parse(Normalize(text)) != PetVoiceCommand.None,
+        var custom = new HashSet<string>(customPhrases, StringComparer.OrdinalIgnoreCase);
+        _session = new OfflineKeywordSession(VoiceCommandCatalog.Phrases, text => VoiceCommandCatalog.Parse(Normalize(text)) != PetVoiceCommand.None || custom.Contains(CustomCommands.NormalizePhrase(Normalize(text))),
             (ok, text) =>
             {
                 if (Interlocked.Exchange(ref _finished, 1) != 0) return;
                 _completed(ok ? Normalize(text) : null, ok ? 1 : 0, ok ? null : "Микрофон или локальное распознавание остановились.");
-            });
+            }, customPhrases);
     }
     private static string Normalize(string? text) => string.Join(" ", (text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(x => x != "[unk]"));
     public void Start()
