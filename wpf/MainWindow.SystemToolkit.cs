@@ -90,7 +90,7 @@ public partial class MainWindow
         values.Children.Add(ToolLabel("Маска ядер (HEX):")); var mask = ToolInput(); mask.Width = 150; mask.Margin = new Thickness(6, 0, 0, 0); values.Children.Add(mask);
         var actions = new WrapPanel(); AddTop(root, actions); var apply = ToolButton("Применить"); var restore = ToolButton("Вернуть исходное"); var save = ToolButton("Сохранить профиль"); var load = ToolButton("Применить профиль"); var kill = ToolButton("Завершить процесс");
         foreach (var b in new[] { apply, restore, save, load, kill }) actions.Children.Add(b);
-        var status = ToolOutput(); status.Text = "Выбери процесс. Маска указывает логические процессоры в текущей группе; изменения для систем с более чем 64 логическими процессорами не поддерживаются."; root.Children.Add(status);
+        var status = ToolOutput(); status.Text = "Выбери процесс. Маска указывает логические процессоры в текущей группе; изменения для систем с несколькими группами процессоров не поддерживаются."; root.Children.Add(status);
         List<ProcessItem> all = new();
         void Filter() { string q = filter.Text.Trim(); list.ItemsSource = all.Where(x => x.ToString().Contains(q, StringComparison.CurrentCultureIgnoreCase)).ToList(); }
         void Refresh() { all = AvailableProcesses(); Filter(); status.Text = $"Найдено доступных процессов: {all.Count}."; }

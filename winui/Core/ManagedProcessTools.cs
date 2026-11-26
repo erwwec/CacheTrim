@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace CacheTrim;
@@ -10,7 +11,8 @@ namespace CacheTrim;
 internal static class ManagedProcessTools
 {
     internal sealed record ProcessIdentity(int Pid, long StartUtcTicks, string Name, string Path);
-    internal sealed record ProcessBackup(ProcessIdentity Identity, ProcessPriorityClass Priority, long Affinity, ProcessPriorityClass AppliedPriority, long AppliedAffinity);
+    internal sealed record ProcessBackup(ProcessIdentity Identity, ProcessPriorityClass Priority, long Affinity, ProcessPriorityClass AppliedPriority, long AppliedAffinity, ProcessPriorityClass? PreviousPriority = null, long? PreviousAffinity = null);
+    [DllImport("kernel32.dll")] private static extern ushort GetActiveProcessorGroupCount();
     internal sealed record ProcessProfile(string Path, ProcessPriorityClass Priority, long Affinity);
     private static readonly string BackupPath = Path.Combine(SystemToolkit.DataDirectory, "process-backups.json");
     private static readonly string ProfilePath = Path.Combine(SystemToolkit.DataDirectory, "process-profiles.json");
@@ -55,7 +57,7 @@ internal static class ManagedProcessTools
         if (priority is not (ProcessPriorityClass.Idle or ProcessPriorityClass.BelowNormal or ProcessPriorityClass.Normal or ProcessPriorityClass.AboveNormal or ProcessPriorityClass.High))
             throw new ArgumentException("Недопустимый приоритет.");
         if (affinity == 0) throw new ArgumentException("Нужно выбрать хотя бы одно ядро.");
-        if (Environment.ProcessorCount > 64) throw new NotSupportedException("На компьютерах с несколькими группами процессоров изменение ядер пока не поддерживается.");
+        if (Environment.ProcessorCount > 64 || (OperatingSystem.IsWindows() && GetActiveProcessorGroupCount() > 1)) throw new NotSupportedException("На компьютерах с несколькими группами процессоров изменение ядер пока не поддерживается.");
         using var p = OpenChecked(identity);
         var backups = Read<ProcessBackup>(BackupPath);
         var beforePriority = p.PriorityClass; var beforeAffinity = p.ProcessorAffinity.ToInt64();
@@ -64,7 +66,7 @@ internal static class ManagedProcessTools
         if (index >= 0) {
             backup = backups[index];
             if (!MatchesKnown(backup, beforePriority, beforeAffinity)) throw new InvalidOperationException("Настройки процесса изменились вне CacheTrim; операция отменена.");
-            backup = backup with { AppliedPriority = priority, AppliedAffinity = affinity }; backups[index] = backup;
+            backup = backup with { PreviousPriority = beforePriority, PreviousAffinity = beforeAffinity, AppliedPriority = priority, AppliedAffinity = affinity }; backups[index] = backup;
         } else { backup = new(identity, beforePriority, beforeAffinity, priority, affinity); backups.Add(backup); }
         // Persist original and intended values before touching the process.
         Write(BackupPath, backups);
@@ -72,7 +74,7 @@ internal static class ManagedProcessTools
         catch { try { p.ProcessorAffinity = new IntPtr(beforeAffinity); p.PriorityClass = beforePriority; } catch { } throw; }
     }
     internal static bool MatchesKnown(ProcessBackup backup, ProcessPriorityClass priority, long affinity) =>
-        (backup.Priority == priority && backup.Affinity == affinity) || (backup.AppliedPriority == priority && backup.AppliedAffinity == affinity);
+        (backup.Priority == priority && backup.Affinity == affinity) || (backup.AppliedPriority == priority && backup.AppliedAffinity == affinity) || (backup.PreviousPriority == priority && backup.PreviousAffinity == affinity);
     internal static void Restore(ProcessIdentity identity)
     {
         using var p = OpenChecked(identity);

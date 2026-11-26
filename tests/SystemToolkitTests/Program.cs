@@ -33,6 +33,7 @@ try {
     Check(ManagedProcessTools.IsProtected(id with { Pid = Environment.ProcessId }, dir, Environment.ProcessId), "own process protected");
     var pb = new ManagedProcessTools.ProcessBackup(id, System.Diagnostics.ProcessPriorityClass.Normal, 3, System.Diagnostics.ProcessPriorityClass.High, 1);
     Check(ManagedProcessTools.MatchesKnown(pb, System.Diagnostics.ProcessPriorityClass.High, 1) && ManagedProcessTools.MatchesKnown(pb, System.Diagnostics.ProcessPriorityClass.Normal, 3) && !ManagedProcessTools.MatchesKnown(pb, System.Diagnostics.ProcessPriorityClass.Idle, 1), "process rollback rejects external changes");
+    Check(ManagedProcessTools.MatchesKnown(pb with { PreviousPriority = System.Diagnostics.ProcessPriorityClass.BelowNormal, PreviousAffinity = 2 }, System.Diagnostics.ProcessPriorityClass.BelowNormal, 2), "previous setting retained for failed reapply");
     Check(InterruptTools.ValidInstance(@"VEN_1234&DEV_5678\instance") && !InterruptTools.ValidInstance(@"..\foo\bar"), "device paths constrained");
     if (OperatingSystem.IsWindows()) {
         string key = @"Software\CacheTrimToolkitTests\" + Guid.NewGuid().ToString("N"); string instance = @"device\instance"; string backup = Path.Combine(dir, "irq.json");
