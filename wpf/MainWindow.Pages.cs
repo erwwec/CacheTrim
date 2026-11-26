@@ -32,6 +32,8 @@ public partial class MainWindow
     {
         BeginPage("Расширенные функции", "Профили производительности и системные операции. Перед применением CacheTrim покажет, что изменится.");
 
+        AddToolDashboard();
+        _pageContent!.Children.Add(new TextBlock { Text = "Системные действия", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brush(Theme.Text), Margin = new Thickness(0, 18, 0, 12) });
         WrapPanel modules = new() { HorizontalAlignment = System.Windows.HorizontalAlignment.Left };
         modules.Children.Add(AdvancedModule("ИГРОВОЙ ПРОФИЛЬ", "Включает игровой режим Windows, план высокой производительности и отключает фоновые игровые записи и ограничение частоты CPU. Может увеличить нагрев и расход батареи.",
             AdvancedButton("Применить игровой профиль", async () => await ApplyGamingProfileAsync(true), true),
@@ -58,24 +60,6 @@ public partial class MainWindow
         modules.Children.Add(AdvancedModule("ПРОИЗВОДИТЕЛЬНОСТЬ WINDOWS", "Высокая производительность уменьшает энергосбережение процессора. На ноутбуке быстрее расходуется заряд. Вернуть прежний план можно этой же карточкой.",
             AdvancedButton("Включить высокую производительность", async () => await ApplyPowerPlanAsync(true), true),
             AdvancedButton("Восстановить прежний план", async () => await ApplyPowerPlanAsync(false))));
-
-        WrapPanel checks = new();
-        checks.Children.Add(AdvancedAction("Проверить файлы Windows", "Проверит защищённые файлы и попробует восстановить повреждённые. Может занять несколько минут.", "Проверяются файлы Windows…", "sfc.exe", "/scannow", 30 * 60 * 1000));
-        checks.Children.Add(AdvancedAction("Проверить диск C:", "Проверит файловую систему диска C: без отключения тома. Исправление ошибок не запускается.", "Проверяется диск C:…", "chkdsk.exe", "C: /scan", 60 * 60 * 1000));
-        checks.Children.Add(Action("Диагностика сети", ShowNetworkDiagnostics));
-        checks.Children.Add(Action("Частота экранов", ShowDisplayDiagnostics));
-        checks.Children.Add(Action("Процессы", ShowProcessManager));
-        checks.Children.Add(Action("Процессоры для процесса", ShowProcessAffinity));
-        checks.Children.Add(Action("Мои игры", ShowGameLibrary));
-        checks.Children.Add(Action("Запись игровой сессии", ShowGameCapture));
-        checks.Children.Add(Action("Программы и магазин", ShowPackageCatalog));
-        checks.Children.Add(Action("Поиск возможных остатков", ShowResidualSearch));
-        checks.Children.Add(Action("Тест процессора", () => ShowSystemInsight("Локальный тест процессора", "Трёхсекундный однопоточный тест SHA-256. Процессор будет нагружен; история сохраняется локально. Это не оценка всей системы и не измерение FPS.", LocalBenchmark.Run)));
-        checks.Children.Add(Action("Здоровье дисков", () => ShowSystemInsight("Здоровье дисков", "Показатели физических накопителей по данным Windows. Поддержка зависит от устройства и драйвера.", SystemInsights.RunDisk)));
-        checks.Children.Add(Action("Защита для античитов", () => ShowSystemInsight("Защита для античитов", "Проверка Secure Boot и TPM без изменения настроек.", SystemInsights.RunSecurity)));
-        checks.Children.Add(Action("Монитор ресурсов", () => OpenSystemTool("resmon.exe")));
-        checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
-        modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
 
         modules.Children.Add(AdvancedModule("ВНЕШНИЕ БАТНИКИ: FLN TWEAKER", "Два сторонних скрипта открываются отдельно и только по кнопке. Они получают права администратора и изменяют Windows; точный откат не гарантирован. Windows Tweaker также предлагает удалить приложения и отключить защитные функции. Ознакомься с предупреждением до запуска.",
             AdvancedButton("Открыть Explorer Tweaker", () => OpenBundledTweaker(BundledTweakerScripts.Script.Explorer)),
