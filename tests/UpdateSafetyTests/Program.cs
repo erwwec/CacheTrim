@@ -11,6 +11,23 @@ internal static class Program
             Check(HotkeyPolicy.Valid(1, 2, 3) && HotkeyPolicy.Valid(0, 0, 0), "three distinct shortcuts and disabled choices accepted");
             Check(!HotkeyPolicy.Valid(1, 1, 0) && !HotkeyPolicy.Valid(0, 2, 2) && !HotkeyPolicy.Valid(3, 0, 3), "duplicate shortcuts rejected");
             Check(!HotkeyPolicy.Valid(7, 0, 0) && !HotkeyPolicy.Valid(0, -1, 0), "shortcut range enforced");
+            Check(BundledTweakerScripts.SafeCommandPath(@"C:\Users\User Name\script.bat"), "ordinary script path is safe");
+            Check(!BundledTweakerScripts.SafeCommandPath(@"C:\Users\%TEMP%\script.bat") && !BundledTweakerScripts.SafeCommandPath("C:\"bad.bat") && !BundledTweakerScripts.SafeCommandPath(@"C:\Users\O'Brien\script.bat"), "cmd expansion and quote injection rejected");
+            foreach (var item in new[] { ("explorer.bat", "9C87A647B1AB6EB8C048816C6D1E9B0A4EF293F4F164596E878D4D053471A44D", 10146), ("win-tweaker.bat", "21013C2E014E7558603D0C3E08E9995B4AE34D7C57A8D296EAA3E988F1DACED1", 23459) }) {
+                string sourcePath = Path.Combine("companion", "TweakerScripts", item.Item1);
+                string target = Path.Combine(dir, item.Item1);
+                using (var source = File.OpenRead(sourcePath)) BundledTweakerScripts.InstallVerified(source, target, item.Item2, item.Item3);
+                using (var verified = BundledTweakerScripts.TryOpenVerified(target, item.Item2, item.Item3)) {
+                    Check(verified != null, item.Item1 + " preserved and verified");
+                    if (OperatingSystem.IsWindows()) { bool blocked = false; try { using var write = new FileStream(target, FileMode.Open, FileAccess.Write, FileShare.ReadWrite); } catch (IOException) { blocked = true; } Check(blocked, "script remains locked against modification"); }
+                }
+                File.WriteAllText(target, "tampered");
+                Check(BundledTweakerScripts.TryOpenVerified(target, item.Item2, item.Item3) == null, "tampered script rejected");
+                using (var source = File.OpenRead(sourcePath)) BundledTweakerScripts.InstallVerified(source, target, item.Item2, item.Item3);
+                Check(File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(sourcePath)), "verified script restored from embedded bytes");
+                try { using var bad = new MemoryStream(new byte[] {1, 2, 3}); BundledTweakerScripts.InstallVerified(bad, target, item.Item2, item.Item3); throw new Exception("bad script accepted"); }
+                catch (InvalidDataException) { Check(File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(sourcePath)), "bad embedded bytes cannot replace valid script"); }
+            }
             byte[] download = new byte[4096]; new Random(42).NextBytes(download);
             var events = new Capture();
             using (var source = new MemoryStream(download)) using (var target = new MemoryStream()) {

@@ -6,10 +6,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>CacheTrim</RootNamespace>
     <AssemblyName>CacheTrim</AssemblyName>
-    <Version>2.1.19</Version>
-    <AssemblyVersion>2.1.19</AssemblyVersion>
-    <FileVersion>2.1.19</FileVersion>
-    <InformationalVersion>2.1.19</InformationalVersion>
+    <Version>2.1.20</Version>
+    <AssemblyVersion>2.1.20</AssemblyVersion>
+    <FileVersion>2.1.20</FileVersion>
+    <InformationalVersion>2.1.20</InformationalVersion>
     <ApplicationManifest>..\app.manifest</ApplicationManifest>
     <Nullable>annotations</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -37,6 +37,8 @@
     <EmbeddedResource Include="..\companion\AnimeAvatar\AnimeAvatar.exe.part00" LogicalName="CacheTrim.AnimeAvatar.part00" />
     <EmbeddedResource Include="..\companion\AnimeAvatar\AnimeAvatar.exe.part01" LogicalName="CacheTrim.AnimeAvatar.part01" />
     <EmbeddedResource Include="..\companion\AnimeAvatar\THIRD_PARTY_NOTICES.txt" LogicalName="CacheTrim.AnimeAvatar.Notices.txt" />
+    <EmbeddedResource Include="..\companion\TweakerScripts\explorer.bat" LogicalName="CacheTrim.TweakerScripts.explorer.bat" />
+    <EmbeddedResource Include="..\companion\TweakerScripts\win-tweaker.bat" LogicalName="CacheTrim.TweakerScripts.win-tweaker.bat" />
   </ItemGroup>
 </Project>
 
