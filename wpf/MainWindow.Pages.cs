@@ -66,6 +66,7 @@ public partial class MainWindow
         checks.Children.Add(Action("Частота экранов", ShowDisplayDiagnostics));
         checks.Children.Add(Action("Процессы", ShowProcessManager));
         checks.Children.Add(Action("Мои игры", ShowGameLibrary));
+        checks.Children.Add(Action("Запись игровой сессии", ShowGameCapture));
         checks.Children.Add(Action("Программы и магазин", ShowPackageCatalog));
         checks.Children.Add(Action("Поиск возможных остатков", ShowResidualSearch));
         checks.Children.Add(Action("Тест процессора", () => ShowSystemInsight("Локальный тест процессора", "Трёхсекундный однопоточный тест SHA-256. Процессор будет нагружен; история сохраняется локально. Это не оценка всей системы и не измерение FPS.", LocalBenchmark.Run)));
