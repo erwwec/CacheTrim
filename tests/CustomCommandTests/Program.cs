@@ -15,5 +15,6 @@ try {
  Reject(()=>CustomCommands.Validate(new[]{command with {Phrases=new(){"прыгни"}}}),"built-in phrase reserved");
  Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("url","javascript:alert(1)")}}}),"reject script links");
  Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("app",app+" --bad")}}}),"reject command arguments");
+ if (OperatingSystem.IsWindows()) Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("app","//server/share/game.exe")}}}),"reject UNC paths after normalization");
  File.WriteAllText(path,"{broken");Reject(()=>CustomCommands.Save(path,new[]{command}),"corrupt file not overwritten");Check(File.ReadAllText(path)=="{broken","preserve corrupt data");
 } finally { Directory.Delete(dir,true); }

@@ -49,7 +49,9 @@ internal static class CustomCommands
                 if (a.Type == "app")
                 {
                     if (a.Target.Length > 1000 || !Path.IsPathFullyQualified(a.Target) || a.Target.StartsWith(@"\\", StringComparison.Ordinal) || !string.Equals(Path.GetExtension(a.Target), ".exe", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Программа должна быть локальным EXE с полным путём (без аргументов).");
-                    actions.Add(new CustomAction("app", Path.GetFullPath(a.Target)));
+                    string fullPath = Path.GetFullPath(a.Target);
+                    if (fullPath.StartsWith(@"\\", StringComparison.Ordinal)) throw new InvalidDataException("Сетевые и специальные пути к программам не поддерживаются.");
+                    actions.Add(new CustomAction("app", fullPath));
                 }
                 else if (a.Type == "url")
                 {
