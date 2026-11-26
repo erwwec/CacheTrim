@@ -21,7 +21,7 @@
             <Image x:Name="PetSprite" Canvas.Left="74" Canvas.Top="180" Width="120" Height="112"
                    Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"
                    MouseLeftButtonDown="Pet_MouseLeftButtonDown" MouseMove="Pet_MouseMove"
-                   MouseLeftButtonUp="Pet_MouseLeftButtonUp" MouseRightButtonUp="Pet_MouseRightButtonUp" />
+                   MouseLeftButtonUp="Pet_MouseLeftButtonUp" LostMouseCapture="Pet_LostMouseCapture" MouseRightButtonUp="Pet_MouseRightButtonUp" />
             <Border x:Name="AssistantBadge" Canvas.Left="65" Canvas.Top="157" Background="#ED361D2C" CornerRadius="6" Padding="7,3" Visibility="Collapsed" IsHitTestVisible="False">
                 <TextBlock x:Name="AssistantBadgeText" Foreground="#FFFFC3CE" FontSize="11" FontWeight="Bold" />
             </Border>

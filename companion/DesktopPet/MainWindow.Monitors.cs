@@ -23,14 +23,19 @@ public partial class MainWindow
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
-    // Use the monitor containing the sprite centre, not always the primary monitor.
-    // PointToScreen/PointFromScreen translate through the current HWND's DPI transform.
-    private Rect GetCurrentMonitorWorkArea()
+    private static IntPtr MonitorAt(Point point) => MonitorFromPoint(new MonitorPoint { X = (int)Math.Round(point.X), Y = (int)Math.Round(point.Y) }, 2);
+
+    // Convert the chosen monitor's physical work area through the active WPF window.
+    private Rect GetCurrentMonitorWorkArea() => GetMonitorWorkArea(IntPtr.Zero);
+    private Rect GetMonitorWorkArea(IntPtr monitor)
     {
         try
         {
-            var center = PointToScreen(new Point((ModelLeft + ModelRight) * _uiScale / 2, (ModelTop + ModelBottom) * _uiScale / 2));
-            var monitor = MonitorFromPoint(new MonitorPoint { X = (int)Math.Round(center.X), Y = (int)Math.Round(center.Y) }, 2); // nearest monitor
+            if (monitor == IntPtr.Zero)
+            {
+                var center = PointToScreen(new Point((ModelLeft + ModelRight) * _uiScale / 2, (ModelTop + ModelBottom) * _uiScale / 2));
+                monitor = MonitorAt(center);
+            }
             var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
             if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return SystemParameters.WorkArea;
             var a = PointFromScreen(new Point(info.Work.Left, info.Work.Top));
@@ -44,14 +49,20 @@ public partial class MainWindow
         }
     }
 
-    private void ConstrainToCurrentMonitor()
+    private void ConstrainToCurrentMonitor() => ConstrainToMonitor(IntPtr.Zero);
+    private void ConstrainToMonitor(IntPtr monitor)
     {
-        var area = GetCurrentMonitorWorkArea();
-        var minLeft = area.Left - ModelLeft * _uiScale;
-        var maxLeft = Math.Max(minLeft, area.Right - ModelRight * _uiScale);
-        var minTop = area.Top - ModelTop * _uiScale;
-        var maxTop = Math.Max(minTop, area.Bottom - ModelBottom * _uiScale);
-        Left = Math.Clamp(Left, minLeft, maxLeft);
-        Top = Math.Clamp(Top, minTop, maxTop);
+        var area = GetMonitorWorkArea(monitor);
+        var position = PetPolicy.ClampPosition(Left, Top, area.Left, area.Top, area.Right, area.Bottom,
+            ModelLeft * _uiScale, ModelTop * _uiScale, ModelRight * _uiScale, ModelBottom * _uiScale);
+        Left = position.X;
+        Top = position.Y;
+    }
+
+    protected override void OnDpiChanged(System.Windows.DpiScale oldDpi, System.Windows.DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        // WPF may finish applying a new transform after the DPI notification.
+        Dispatcher.BeginInvoke(new Action(() => { if (!_dragging && !_isClosing && IsLoaded) ConstrainToCurrentMonitor(); }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 }

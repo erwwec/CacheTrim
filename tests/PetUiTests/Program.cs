@@ -35,6 +35,10 @@ internal static class Program
             sizes.SelectedIndex = 0; Check((double)type.GetField("_uiScale", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)! == 0.5, "50 percent size selected");
             sizes.SelectedIndex = 1; Check((double)type.GetField("_uiScale", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)! == 1.0, "100 percent size selected");
             sizes.SelectedIndex = 2; Check((double)type.GetField("_uiScale", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)! == 1.5, "150 percent size selected");
+            var area = (Rect)type.GetMethod("GetCurrentMonitorWorkArea", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null)!;
+            pet.Top = area.Bottom - 292 * 1.5 + 30;
+            type.GetMethod("ConstrainToCurrentMonitor", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(pet, null);
+            Check(pet.Top + 292 * 1.5 <= area.Bottom + 1, "pet is kept above the current monitor taskbar");
             ((System.Windows.Controls.Button)Element("AssistantOpenButton")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             var assistantWindow = (Window)type.GetField("_assistantWindow", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pet)!;
             Check(assistantWindow != pet && assistantWindow.IsVisible && assistantWindow.Content == Element("AssistantContent"), "assistant opens in a separate window");
