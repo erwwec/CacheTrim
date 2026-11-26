@@ -64,6 +64,9 @@ public partial class MainWindow
         checks.Children.Add(AdvancedAction("Проверить диск C:", "Проверит файловую систему диска C: без отключения тома. Исправление ошибок не запускается.", "Проверяется диск C:…", "chkdsk.exe", "C: /scan", 60 * 60 * 1000));
         checks.Children.Add(Action("Диагностика сети", ShowNetworkDiagnostics));
         checks.Children.Add(Action("Частота экранов", ShowDisplayDiagnostics));
+        checks.Children.Add(Action("Тест процессора", () => ShowSystemInsight("Локальный тест процессора", "Трёхсекундный однопоточный тест SHA-256. Процессор будет нагружен; история сохраняется локально. Это не оценка всей системы и не измерение FPS.", LocalBenchmark.Run)));
+        checks.Children.Add(Action("Здоровье дисков", () => ShowSystemInsight("Здоровье дисков", "Показатели физических накопителей по данным Windows. Поддержка зависит от устройства и драйвера.", SystemInsights.RunDisk)));
+        checks.Children.Add(Action("Защита для античитов", () => ShowSystemInsight("Защита для античитов", "Проверка Secure Boot и TPM без изменения настроек.", SystemInsights.RunSecurity)));
         checks.Children.Add(Action("Монитор ресурсов", () => OpenSystemTool("resmon.exe")));
         checks.Children.Add(Action("Центр обновления Windows", () => OpenSystemTool("ms-settings:windowsupdate")));
         modules.Children.Add(AdvancedModule("ПРОВЕРКА И ИНСТРУМЕНТЫ", "Диагностика без изменения системных параметров.", checks));
