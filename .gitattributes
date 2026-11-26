@@ -1,0 +1,2 @@
+# Preserve exact third-party script bytes for the embedded SHA-256 checks.
+companion/TweakerScripts/*.bat -text
