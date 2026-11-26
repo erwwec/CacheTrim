@@ -117,13 +117,14 @@ public partial class MainWindow : Window
         AssistantKeyLabel.Text = "Ключ " + AiProviderConfig.Name(SelectedAiProvider);
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
         AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
-        _uiScale = PetPolicy.NearestSize(_uiScale);
+        _uiScale = PetPolicy.NormalizeSize(_uiScale);
         PetCanvas.LayoutTransform = new ScaleTransform(_uiScale, _uiScale);
         Width = 260 * _uiScale;
         Height = 320 * _uiScale;
         ChatterSlider.Value = _chatterLevel;
         JumpSlider.Value = _jumpRate;
-        SizeSelector.SelectedIndex = _uiScale == 0.5 ? 0 : _uiScale == 1.0 ? 1 : 2;
+        SizeSlider.Value = _uiScale * 100;
+        SizeLabel.Text = $"Размер Клода: {_uiScale * 100:0}%";
         OpacitySlider.Value = _petOpacity;
         PetCanvas.Opacity = _petOpacity;
         OpacityLabel.Text = $"Непрозрачность: {_petOpacity:P0}";
@@ -1057,10 +1058,12 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    private void SizeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void SizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_initializing || !IsInitialized || PetCanvas is null || SizeSelector.SelectedIndex < 0) return;
-        var newScale = SizeSelector.SelectedIndex switch { 0 => 0.5, 1 => 1.0, _ => 1.5 };
+        if (_initializing || !IsInitialized || PetCanvas is null || SizeSlider is null || SizeLabel is null) return;
+        var newScale = PetPolicy.NormalizeSize(SizeSlider.Value / 100);
+        if (Math.Abs(SizeSlider.Value - newScale * 100) > 0.0001) { SizeSlider.Value = newScale * 100; return; }
+        SizeLabel.Text = $"Размер Клода: {newScale * 100:0}%";
         var footPosition = Top + ModelBottom * _uiScale;
         var modelCenterX = Left + (ModelLeft + ModelRight) / 2 * _uiScale;
         _uiScale = newScale;
