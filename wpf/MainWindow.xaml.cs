@@ -150,6 +150,7 @@ public partial class MainWindow : Window
         AddNav("Память", "☷", "memory");
         AddNav("Очистка", "◇", "clean");
         AddNav("Оптимизация", "⚙", "optimize");
+        AddNav("Игры и диагностика", "◉", "toolkit");
         AddNav("Расширенные", "⚡", "advanced");
         AddNav("Питомец", "◆", "pet");
         AddNav("Автозагрузка", "⏻", "startup");
@@ -189,6 +190,7 @@ public partial class MainWindow : Window
         {
             case "clean": ShowClean(); break;
             case "optimize": ShowOptimize(); break;
+            case "toolkit": ShowSystemToolkit(); break;
             case "advanced": ShowAdvanced(); break;
             case "pet": ShowPet(); break;
             case "startup": ShowStartup(); break;
@@ -256,6 +258,7 @@ public partial class MainWindow : Window
             {
                 case "clean": ShowClean(); break;
                 case "optimize": ShowOptimize(); break;
+            case "toolkit": ShowSystemToolkit(); break;
                 case "advanced": ShowAdvanced(); break;
                 case "settings": ShowSettings(); break;
             }
