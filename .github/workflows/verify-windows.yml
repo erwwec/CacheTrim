@@ -165,3 +165,39 @@ jobs:
         run: |
           dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }
+      - name: Package experimental build for manual testing
+        if: github.ref == 'refs/heads/feat/system-insights'
+        shell: pwsh
+        run: |
+          $out = '.\dist\experimental-test'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item .\dist\verify\CacheTrim.exe $out
+          Copy-Item .\dist\pet-publish\DesktopPet.exe $out
+          Copy-Item .\dist\pet-publish\VoiceModel $out -Recurse
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $native = Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64'
+          foreach ($name in @('libvosk.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.dll')) {
+            $file = Join-Path $native $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing Vosk dependency: $name" }
+            Copy-Item -LiteralPath $file -Destination $out
+          }
+          foreach ($name in @('CacheTrim.exe', 'DesktopPet.exe')) {
+            $hash = (Get-FileHash -LiteralPath (Join-Path $out $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -LiteralPath (Join-Path $out ($name + '.sha256')) -Value $hash -NoNewline -Encoding ASCII
+          }
+          @'
+          ЭКСПЕРИМЕНТАЛЬНАЯ ТЕСТОВАЯ СБОРКА — не официальный выпуск и не обновление через программу.
+          Новые функции не испытаны на реальном ПК; сначала тестируйте на виртуальной машине или отдельной тестовой учётной записи без важных данных.
+          Программа запрашивает права администратора. Установка и удаление программ, процессы и настройки CPU могут затронуть данные и работу системы.
+          Не заменяйте установленную рабочую копию. Сохраните оба EXE рядом. Для голоса запускайте DesktopPet.exe напрямую и храните DLL и VoiceModel рядом.
+          Экспериментальный мониторинг требует отдельного официального PresentMon 2.6.0 x64. Проверка хеша EXE не проверяет DLL и модель.
+          Онлайн-рейтинг, настройки прерываний, эксклюзивное резервирование ядер и готовые профили отдельных игр не реализованы.
+          '@ | Set-Content -LiteralPath (Join-Path $out 'ПРОЧИТАЙ-МЕНЯ.txt') -Encoding UTF8
+      - name: Upload experimental build artifact
+        if: github.ref == 'refs/heads/feat/system-insights'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CacheTrim-experimental-${{ github.sha }}
+          path: dist/experimental-test/
+          if-no-files-found: error
+          retention-days: 14
