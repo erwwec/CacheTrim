@@ -174,6 +174,7 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 2, 0, 2),
             Tag = page
         };
+        if (page == "advanced") System.Windows.Automation.AutomationProperties.SetAutomationId(button, "nav-advanced");
         button.Click += (_, _) => Navigate(page);
         NavigationItems.Children.Add(button);
         if (page == _activePage) SetNavSelected(button, true);
