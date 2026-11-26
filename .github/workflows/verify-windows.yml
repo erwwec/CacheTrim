@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands']
   pull_request:
     branches: [main]
 
@@ -154,6 +154,11 @@ jobs:
           $env:PATH = (Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64') + ';' + $env:PATH
           dotnet run --project .\tests\OfflineSpeechTests\OfflineSpeechTests.csproj -c Release -- .\dist\pet-publish\VoiceModel\vosk-model-small-ru-0.22
           if ($LASTEXITCODE -ne 0) { throw 'Bundled speech model test failed' }
+      - name: Test user-defined command validation and persistence
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CustomCommandTests\CustomCommandTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Custom command safety tests failed' }
       - name: Test V2 assistant command allowlist
         shell: pwsh
         run: |
