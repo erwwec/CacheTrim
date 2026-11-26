@@ -67,6 +67,11 @@ jobs:
         run: |
           dotnet run --project .\tests\ProcessManagerTests\ProcessManagerTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Process safety checks failed' }
+      - name: Test package catalog argument safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\PackageCatalogTests\PackageCatalogTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Package catalog checks failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
