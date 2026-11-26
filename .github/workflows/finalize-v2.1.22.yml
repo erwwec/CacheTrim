@@ -1,0 +1,52 @@
+name: Finish CacheTrim 2.1.22 release
+on:
+  push:
+    branches: ['release/v2.1.22-redesign']
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate original draft and tested commit
+        shell: pwsh
+        run: |
+          $r = gh api repos/erwwec/CacheTrim/releases/459724993 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $r.draft -or $r.prerelease -or $r.tag_name -ne 'v2.1.22' -or $r.target_commitish -ne '5b611d8b8b96041dfdc6953a83afabe0d6a629f6') { throw 'Draft release or source commit mismatch' }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'CacheTrim-release' }
+          $ref = Invoke-WebRequest -Uri 'https://api.github.com/repos/erwwec/CacheTrim/git/ref/tags/v2.1.22' -Headers $h -SkipHttpErrorCheck
+          if ($ref.StatusCode -ne 404) { throw "Tag already exists or ref check failed: HTTP $($ref.StatusCode)" }
+      - name: Verify all six uploaded files and checksums
+        shell: pwsh
+        run: |
+          $r = gh api repos/erwwec/CacheTrim/releases/459724993 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read draft assets' }
+          $names = @('CacheTrim.exe','CacheTrim.exe.sha256','DesktopPet.exe','DesktopPet.exe.sha256','DesktopPet-voice-pack.zip','DesktopPet-voice-pack.zip.sha256')
+          if (@($r.assets).Count -ne $names.Count) { throw 'Wrong number of assets' }
+          foreach ($name in $names) {
+            $matches = @($r.assets | Where-Object { $_.name -ceq $name })
+            if ($matches.Count -ne 1 -or $matches[0].state -ne 'uploaded' -or $matches[0].size -lt 1 -or $matches[0].digest -notmatch '^sha256:[a-f0-9]{64}$') { throw "Invalid asset $name" }
+          }
+          foreach ($name in @('CacheTrim.exe','DesktopPet.exe','DesktopPet-voice-pack.zip')) {
+            $data = @($r.assets | Where-Object { $_.name -ceq $name })[0]
+            $checksum = @($r.assets | Where-Object { $_.name -ceq ($name + '.sha256') })[0]
+            if ($checksum.size -ne 64) { throw "Wrong checksum size: $name" }
+            $body = gh api "repos/erwwec/CacheTrim/releases/assets/$($checksum.id)" -H 'Accept: application/octet-stream'
+            if ($LASTEXITCODE -ne 0) { throw "Cannot download checksum: $name" }
+            $hash = ($body | Out-String).Trim().ToLowerInvariant()
+            if ($hash -notmatch '^[a-f0-9]{64}$' -or $data.digest -ne "sha256:$hash") { throw "Checksum does not match uploaded asset: $name" }
+          }
+      - name: Publish the verified draft
+        shell: pwsh
+        run: |
+          $r = gh api --method PATCH repos/erwwec/CacheTrim/releases/459724993 -F draft=false -f make_latest=true | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $r.draft -or $r.prerelease -or $r.tag_name -ne 'v2.1.22') { throw 'Publish failed' }
+      - name: Verify published tag and latest release
+        shell: pwsh
+        run: |
+          $ref = gh api repos/erwwec/CacheTrim/git/ref/tags/v2.1.22 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $ref.object.sha -ne '5b611d8b8b96041dfdc6953a83afabe0d6a629f6') { throw 'Tag does not point to tested commit' }
+          $latest = gh api repos/erwwec/CacheTrim/releases/latest | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $latest.tag_name -ne 'v2.1.22') { throw 'Latest release not updated' }
