@@ -77,6 +77,11 @@ jobs:
         run: |
           dotnet run --project .\tests\GameLibraryTests\GameLibraryTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Game library checks failed' }
+      - name: Test game capture analysis
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\GameCaptureTests\GameCaptureTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Game capture analysis failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
