@@ -113,7 +113,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         AssistantProvider.SelectedIndex = _aiProviderIndex;
         AssistantSpeechProvider.SelectedIndex = _speechProviderIndex;
-        AssistantCommandSelector.ItemsSource = VoiceCommandCatalog.Phrases;
+        RefreshCustomCommands();
         AssistantKeyLabel.Text = "Ключ " + AiProviderConfig.Name(SelectedAiProvider);
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
         AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
