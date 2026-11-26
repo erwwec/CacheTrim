@@ -31,18 +31,18 @@ internal static class ProcessManager
         string path = System.IO.Path.GetFullPath(current.Path);
         if (path.StartsWith(windows, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Процессы из папки Windows здесь не изменяются.");
     }
-    private static void WithProcess(Entry entry, Action<Process> action)
+    internal static T WithCheckedProcess<T>(Entry entry, Func<Process, T> action)
     {
         using var current = Process.GetProcessById(entry.Id);
         using var self = Process.GetCurrentProcess();
         Validate(entry, Snapshot(current), self.Id, self.SessionId, Environment.GetFolderPath(Environment.SpecialFolder.Windows));
-        action(current);
+        return action(current);
     }
-    internal static void Stop(Entry entry) => WithProcess(entry, p => p.Kill());
+    internal static void Stop(Entry entry) => WithCheckedProcess(entry, p => { p.Kill(); return 0; });
     internal static void SetPriority(Entry entry, ProcessPriorityClass priority)
     {
         if (priority != ProcessPriorityClass.BelowNormal && priority != ProcessPriorityClass.Normal && priority != ProcessPriorityClass.AboveNormal)
             throw new ArgumentOutOfRangeException(nameof(priority));
-        WithProcess(entry, p => p.PriorityClass = priority);
+        WithCheckedProcess(entry, p => { p.PriorityClass = priority; return 0; });
     }
 }

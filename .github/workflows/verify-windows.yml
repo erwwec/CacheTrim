@@ -82,6 +82,11 @@ jobs:
         run: |
           dotnet run --project .\tests\GameCaptureTests\GameCaptureTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Game capture analysis failed' }
+      - name: Test process affinity backup safeguards
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\ProcessAffinityTests\ProcessAffinityTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Affinity checks failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
