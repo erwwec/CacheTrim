@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design']
   pull_request:
     branches: [main]
 
@@ -52,6 +52,10 @@ jobs:
       - name: Check Desktop Acrylic backdrop
         shell: pwsh
         run: .\tests\SmokeGlass.ps1
+      - name: Check tool dashboard structure
+        if: github.ref == 'refs/heads/fix/diagnostics-design'
+        shell: pwsh
+        run: .\tests\SmokeToolsDashboard.ps1
       - name: Test WPF glass frame setup
         shell: pwsh
         run: |
@@ -166,7 +170,7 @@ jobs:
           dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }
       - name: Package experimental build for manual testing
-        if: github.ref == 'refs/heads/feat/system-insights'
+        if: github.ref == 'refs/heads/feat/system-insights' || github.ref == 'refs/heads/fix/diagnostics-design'
         shell: pwsh
         run: |
           $out = '.\dist\experimental-test'
@@ -187,14 +191,14 @@ jobs:
           }
           @'
           ЭКСПЕРИМЕНТАЛЬНАЯ ТЕСТОВАЯ СБОРКА — не официальный выпуск и не обновление через программу.
-          Новые функции не испытаны на реальном ПК; сначала тестируйте на виртуальной машине или отдельной тестовой учётной записи без важных данных.
+          Дизайн инструментов и новые функции не испытаны на реальном ПК; сначала тестируйте на виртуальной машине или отдельной тестовой учётной записи без важных данных.
           Программа запрашивает права администратора. Установка и удаление программ, процессы и настройки CPU могут затронуть данные и работу системы.
           Не заменяйте установленную рабочую копию. Сохраните оба EXE рядом. Для голоса запускайте DesktopPet.exe напрямую и храните DLL и VoiceModel рядом.
           Экспериментальный мониторинг требует отдельного официального PresentMon 2.6.0 x64. Проверка хеша EXE не проверяет DLL и модель.
           Онлайн-рейтинг, настройки прерываний, эксклюзивное резервирование ядер и готовые профили отдельных игр не реализованы.
           '@ | Set-Content -LiteralPath (Join-Path $out 'ПРОЧИТАЙ-МЕНЯ.txt') -Encoding UTF8
       - name: Upload experimental build artifact
-        if: github.ref == 'refs/heads/feat/system-insights'
+        if: github.ref == 'refs/heads/feat/system-insights' || github.ref == 'refs/heads/fix/diagnostics-design'
         uses: actions/upload-artifact@v4
         with:
           name: CacheTrim-experimental-${{ github.sha }}
