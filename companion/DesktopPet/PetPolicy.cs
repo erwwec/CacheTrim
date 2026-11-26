@@ -4,7 +4,8 @@ namespace DesktopPet;
 
 internal static class PetPolicy
 {
-    public static double NearestSize(double value) => value < 0.75 ? 0.5 : value < 1.25 ? 1.0 : 1.5;
+    // Slider range 50–200%, in 5% steps; preserve old saved values within this range.
+    public static double NormalizeSize(double value) => !double.IsFinite(value) ? 0.5 : Math.Round(Math.Clamp(value, 0.5, 2.0) * 20, MidpointRounding.AwayFromZero) / 20;
 
     public static (double X, double Y) ClampPosition(double x, double y, double workLeft, double workTop, double workRight, double workBottom, double visualLeft, double visualTop, double visualRight, double visualBottom)
     {
