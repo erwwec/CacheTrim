@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'feat/claude-size-slider']
   pull_request:
     branches: [main]
 
@@ -166,7 +166,7 @@ jobs:
           dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }
       - name: Package experimental build for manual testing
-        if: github.ref == 'refs/heads/feat/system-insights'
+        if: github.ref == 'refs/heads/feat/system-insights' || github.ref == 'refs/heads/feat/claude-size-slider'
         shell: pwsh
         run: |
           $out = '.\dist\experimental-test'
@@ -194,7 +194,7 @@ jobs:
           Онлайн-рейтинг, настройки прерываний, эксклюзивное резервирование ядер и готовые профили отдельных игр не реализованы.
           '@ | Set-Content -LiteralPath (Join-Path $out 'ПРОЧИТАЙ-МЕНЯ.txt') -Encoding UTF8
       - name: Upload experimental build artifact
-        if: github.ref == 'refs/heads/feat/system-insights'
+        if: github.ref == 'refs/heads/feat/system-insights' || github.ref == 'refs/heads/feat/claude-size-slider'
         uses: actions/upload-artifact@v4
         with:
           name: CacheTrim-experimental-${{ github.sha }}
