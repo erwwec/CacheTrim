@@ -9,12 +9,14 @@ Check(!PetPolicy.ReminderDue(30, now.AddMinutes(-1), now, false, true), "open me
 Check(PetPolicy.CanChangeAutostart(null, "own"), "missing startup entry can be created");
 Check(PetPolicy.CanChangeAutostart("OWN", "own"), "own startup entry can be removed");
 Check(!PetPolicy.CanChangeAutostart("other", "own"), "modified startup entry is not touched");
-Check(PetPolicy.NearestSize(0.5) == 0.5, "50 percent size");
-Check(PetPolicy.NearestSize(0.6) == 0.5, "old saved size rounds to nearest option");
-Check(PetPolicy.NearestSize(0.75) == 1.0, "size midpoint rounds up");
-Check(PetPolicy.NearestSize(1.2) == 1.0, "100 percent size");
-Check(PetPolicy.NearestSize(1.5) == 1.5, "150 percent size");
-Check(PetPolicy.NearestSize(2.0) == 1.5, "old 200 percent size capped at 150");
+Check(PetPolicy.NormalizeSize(0.5) == 0.5, "50 percent size");
+Check(PetPolicy.NormalizeSize(0.6) == 0.6, "saved 60 percent size preserved");
+Check(PetPolicy.NormalizeSize(0.75) == 0.75, "75 percent size");
+Check(PetPolicy.NormalizeSize(1.23) == 1.25, "size snaps to 5 percent");
+Check(PetPolicy.NormalizeSize(1.5) == 1.5, "150 percent size");
+Check(PetPolicy.NormalizeSize(2.0) == 2.0, "200 percent size");
+Check(PetPolicy.NormalizeSize(2.9) == 2.0 && PetPolicy.NormalizeSize(0.1) == 0.5, "out of range is clamped");
+Check(PetPolicy.NormalizeSize(double.NaN) == 0.5, "non-finite size uses default");
 Check(PetPolicy.FeetBelowWorkArea(800, 80, 840), "feet below a higher monitor taskbar must be recovered");
 Check(!PetPolicy.FeetBelowWorkArea(760, 80, 840), "feet on work area edge are not below taskbar");
 

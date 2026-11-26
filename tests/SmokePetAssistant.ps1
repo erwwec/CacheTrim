@@ -52,20 +52,16 @@ try {
     $button = $null
     for ($i=0; $i -lt 20 -and -not $button; $i++) { Start-Sleep -Milliseconds 500; $button=Find-Control $p.Id 'AssistantOpenButton' }
     if (-not $button) { throw 'Assistant button missing from pet menu' }
-    $size = Find-Control $p.Id 'SizeSelector'
-    if (-not $size) { throw 'Size selector missing' }
-    $expand = $size.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
-    $expand.Expand(); Start-Sleep -Milliseconds 500
-    foreach ($expected in @('50%', '100%', '150%')) {
-        $c=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$expected)
-        $item=$size.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$c)
-        if (-not $item) { throw "Size option $expected not found" }
-    }
-    $expand.Collapse()
+    $size = Find-Control $p.Id 'SizeSlider'
+    if (-not $size) { throw 'Size slider missing' }
+    $range = $size.GetCurrentPattern([System.Windows.Automation.RangeValuePattern]::Pattern)
+    if ($range.Current.Minimum -ne 50 -or $range.Current.Maximum -ne 200) { throw 'Size slider range is incorrect' }
+    $range.SetValue(125); Start-Sleep -Milliseconds 500
+    if ([Math]::Abs($range.Current.Value - 125) -gt 0.1) { throw 'Size slider could not select 125%' }
     $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
     $assistant = [IntPtr]::Zero
     for ($i=0; $i -lt 20; $i++) { Start-Sleep -Milliseconds 500; $assistant=[AssistantSmokeNative]::Find($p.Id,'Клод V2 — помощник (тест)'); if ($assistant -ne [IntPtr]::Zero) { break } }
     if ($assistant -eq [IntPtr]::Zero -or $assistant -eq $h) { throw 'Separate assistant window was not shown' }
     if (-not (Find-Control $p.Id 'AssistantCloudText')) { throw 'Assistant task input missing' }
-    Write-Host 'Separate assistant window and all three size options were shown.'
+    Write-Host 'Separate assistant window and adjustable size slider were shown.'
 } finally { $p.Refresh(); if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
