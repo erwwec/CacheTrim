@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights']
   pull_request:
     branches: [main]
 
@@ -57,6 +57,11 @@ jobs:
         run: |
           dotnet run --project .\tests\GlassFrameTests\GlassFrameTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'WPF glass frame test failed' }
+      - name: Test read-only system insights formatting
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\SystemInsightsTests\SystemInsightsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'System insights checks failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
