@@ -72,6 +72,11 @@ jobs:
         run: |
           dotnet run --project .\tests\PackageCatalogTests\PackageCatalogTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Package catalog checks failed' }
+      - name: Test game library safety
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\GameLibraryTests\GameLibraryTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Game library checks failed' }
       - name: Test cleanup boundaries
         shell: pwsh
         run: |
