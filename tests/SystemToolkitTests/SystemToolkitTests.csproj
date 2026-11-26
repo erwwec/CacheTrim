@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../winui/Core/SystemToolkit.cs" Link="SystemToolkit.cs" />
+    <Compile Include="../../winui/Core/ManagedProcessTools.cs" Link="ManagedProcessTools.cs" />
+    <Compile Include="../../winui/Core/GamingToolkit.cs" Link="GamingToolkit.cs" />
+    <Compile Include="../../winui/Core/InterruptTools.cs" Link="InterruptTools.cs" />
+  </ItemGroup>
+</Project>

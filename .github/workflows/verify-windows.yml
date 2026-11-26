@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-toolkit']
   pull_request:
     branches: [main]
 
@@ -135,3 +135,9 @@ jobs:
         run: |
           dotnet run --project .\tests\UpdateSafetyTests\UpdateSafetyTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Update safety tests failed' }
+
+      - name: Test system toolkit safeguards
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\SystemToolkitTests\SystemToolkitTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'System toolkit safeguards failed' }
