@@ -91,8 +91,8 @@
                             <ComboBox x:Name="ModelSelector" MinHeight="30" Margin="0,0,0,8" SelectionChanged="ModelSelector_SelectionChanged">
                                 <ComboBoxItem Content="Обычный Клод" /><ComboBoxItem Content="Клод V2" />
                             </ComboBox>
-                            <TextBlock Text="Размер Клода" Foreground="#FFF7F1FC" Margin="0,4,0,3" />
-                            <ComboBox x:Name="SizeSelector" MinHeight="30" Margin="0,0,0,8" SelectionChanged="SizeSelector_SelectionChanged"><ComboBoxItem Content="50%" /><ComboBoxItem Content="100%" /><ComboBoxItem Content="150%" /></ComboBox>
+                            <TextBlock x:Name="SizeLabel" Text="Размер Клода: 50%" Foreground="#FFF7F1FC" Margin="0,4,0,3" />
+                            <Slider x:Name="SizeSlider" Minimum="50" Maximum="200" Value="50" TickFrequency="5" IsSnapToTickEnabled="True" SmallChange="5" LargeChange="25" HorizontalAlignment="Stretch" Margin="0,0,0,8" AutomationProperties.Name="Размер Клода, проценты" ValueChanged="SizeSlider_ValueChanged" />
                             <TextBlock x:Name="OpacityLabel" Foreground="#FFF7F1FC" Margin="0,4,0,2" />
                             <Slider x:Name="OpacitySlider" Minimum="0.35" Maximum="1" Value="1" HorizontalAlignment="Stretch" ValueChanged="OpacitySlider_ValueChanged" Margin="0,0,0,6" />
                             <Button Content="Запомнить стартовое положение" Click="RememberPosition_Click" />
