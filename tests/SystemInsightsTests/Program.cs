@@ -15,6 +15,7 @@ try
     Check(LocalBenchmark.AddAndSave(path, first).Count == 1, "benchmark history created");
     Check(LocalBenchmark.AddAndSave(path, first).Count == 2, "benchmark history appended");
     Check(LocalBenchmark.Format(first, new[] { first }).Contains("не онлайн-рейтинг"), "benchmark labels scope");
+    Check(LocalBenchmark.Format(first, new[] { first }).Contains("1 из 1"), "local-only ranking");
     File.WriteAllText(path, "broken");
     try { LocalBenchmark.AddAndSave(path, first); throw new Exception("corrupt history accepted"); } catch (System.Text.Json.JsonException) { }
     Check(File.ReadAllText(path) == "broken", "corrupt history preserved");

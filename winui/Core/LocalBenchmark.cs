@@ -46,6 +46,8 @@ internal static class LocalBenchmark
     {
         var text = new StringBuilder("Только скорость SHA-256 в одном потоке, не общая оценка ПК и не прогноз FPS. Скорость зависит от загрузки, температуры, питания и реализации .NET. Для сравнения используй одинаковые условия.\n\n");
         text.AppendLine("Результат: " + result.MebibytesPerSecond.ToString("0.0", CultureInfo.InvariantCulture) + " МиБ/с");
+        int rank = 1 + history.Count(x => x.MebibytesPerSecond > result.MebibytesPerSecond);
+        text.AppendLine("Место среди сохранённых локальных измерений: " + rank + " из " + history.Count + ". Это не сравнение с другими компьютерами.");
         text.AppendLine("Локальная история (новые сверху; не онлайн-рейтинг):");
         foreach (var item in history.Reverse().Take(10)) text.AppendLine(item.TimeUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") + " — " + item.MebibytesPerSecond.ToString("0.0", CultureInfo.InvariantCulture) + " МиБ/с");
         return text.ToString();
