@@ -1,0 +1,106 @@
+name: Publish CacheTrim 2.1.22
+on:
+  push:
+    branches: ['release/v2.1.22-redesign']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5b611d8b8b96041dfdc6953a83afabe0d6a629f6
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Check version and ensure tag is new
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ((git rev-parse HEAD) -ne '5b611d8b8b96041dfdc6953a83afabe0d6a629f6') { throw 'Unexpected source commit' }
+          if (-not ((Get-Content -Raw .\winui\Core\AppInfo.cs).Contains('Version = "2.1.22"'))) { throw 'Wrong app version' }
+          if (-not ((Get-Content -Raw .\wpf\CacheTrim.Wpf.csproj).Contains('<Version>2.1.22</Version>'))) { throw 'Wrong project version' }
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'CacheTrim-release' }
+          foreach ($path in @('git/ref/tags/v2.1.22', 'releases/tags/v2.1.22')) {
+            $response = Invoke-WebRequest -Uri "https://api.github.com/repos/erwwec/CacheTrim/$path" -Headers $headers -SkipHttpErrorCheck
+            if ($response.StatusCode -ne 404) { throw "Ref or release already exists or GitHub check failed: $path HTTP $($response.StatusCode)" }
+          }
+      - name: Build desktop pet
+        shell: pwsh
+        run: |
+          dotnet publish .\companion\DesktopPet\DesktopPet.csproj -c Release -r win-x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o .\dist\pet-publish
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop Pet publish failed' }
+          Copy-Item .\dist\pet-publish\DesktopPet.exe .\dist\DesktopPet.exe -Force
+      - name: Package voice files
+        shell: pwsh
+        run: |
+          $dir = '.\dist\voice-pack'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Copy-Item .\dist\pet-publish\DesktopPet.exe $dir -Force
+          Copy-Item .\dist\pet-publish\VoiceModel $dir -Recurse -Force
+          $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+          $native = Join-Path $nugetRoot 'vosk\0.3.38\build\lib\win-x64'
+          foreach ($name in @('libvosk.dll','libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll')) {
+            $file = Join-Path $native $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing Vosk dependency: $name" }
+            Copy-Item -LiteralPath $file -Destination $dir -Force
+          }
+          Compress-Archive -Path "$dir\*" -DestinationPath .\dist\DesktopPet-voice-pack.zip -Force
+      - name: Build main app with pet integrity pin
+        shell: pwsh
+        run: |
+          $petHash = (Get-FileHash .\dist\DesktopPet.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          dotnet publish .\wpf\CacheTrim.Wpf.csproj -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:TrustedDesktopPetSha256=$petHash" -o .\dist\verify
+          if ($LASTEXITCODE -ne 0) { throw 'App publish failed' }
+          Copy-Item .\dist\verify\CacheTrim.exe .\dist\CacheTrim.exe -Force
+          $assembly = '.\wpf\obj\x64\Release\net10.0-windows10.0.19041.0\win-x64\CacheTrim.dll'
+          dotnet run --project .\tests\BuildPinTests\BuildPinTests.csproj -c Release -- $assembly $petHash
+          if ($LASTEXITCODE -ne 0) { throw 'Pet integrity pin test failed' }
+      - name: Smoke-test the exact release executable
+        shell: pwsh
+        run: .\tests\SmokeToolsDashboard.ps1
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          foreach ($name in @('CacheTrim.exe','DesktopPet.exe','DesktopPet-voice-pack.zip')) {
+            $hash = (Get-FileHash -LiteralPath (Join-Path '.\dist' $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -LiteralPath (Join-Path '.\dist' ($name + '.sha256')) -Value $hash -NoNewline -Encoding ASCII
+          }
+      - name: Create draft release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.1.22
+          target_commitish: 5b611d8b8b96041dfdc6953a83afabe0d6a629f6
+          name: CacheTrim 2.1.22
+          draft: true
+          prerelease: false
+          body_path: RELEASE_NOTES.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/CacheTrim.exe
+            dist/CacheTrim.exe.sha256
+            dist/DesktopPet.exe
+            dist/DesktopPet.exe.sha256
+            dist/DesktopPet-voice-pack.zip
+            dist/DesktopPet-voice-pack.zip.sha256
+      - name: Validate uploads and publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = gh api repos/erwwec/CacheTrim/releases/tags/v2.1.22 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $release.draft -or $release.prerelease) { throw 'Expected draft not found' }
+          $ref = gh api repos/erwwec/CacheTrim/git/ref/tags/v2.1.22 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $ref.object.sha -ne '5b611d8b8b96041dfdc6953a83afabe0d6a629f6') { throw 'Tag target differs from tested source' }
+          $names = @('CacheTrim.exe','CacheTrim.exe.sha256','DesktopPet.exe','DesktopPet.exe.sha256','DesktopPet-voice-pack.zip','DesktopPet-voice-pack.zip.sha256')
+          if (@($release.assets).Count -ne $names.Count) { throw 'Wrong number of assets' }
+          foreach ($name in $names) {
+            $asset = @($release.assets | Where-Object { $_.name -eq $name })
+            if ($asset.Count -ne 1 -or $asset[0].size -ne (Get-Item -LiteralPath (Join-Path '.\dist' $name)).Length) { throw "Asset missing or wrong size: $name" }
+            $actual = (Get-FileHash -LiteralPath (Join-Path '.\dist' $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (-not $asset[0].digest -or $asset[0].digest -ne "sha256:$actual") { throw "Asset digest mismatch or unavailable: $name" }
+          }
+          gh release edit v2.1.22 --draft=false --latest --repo erwwec/CacheTrim
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish release' }
