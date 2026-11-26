@@ -65,6 +65,7 @@ public partial class MainWindow
         checks.Children.Add(Action("Диагностика сети", ShowNetworkDiagnostics));
         checks.Children.Add(Action("Частота экранов", ShowDisplayDiagnostics));
         checks.Children.Add(Action("Процессы", ShowProcessManager));
+        checks.Children.Add(Action("Процессоры для процесса", ShowProcessAffinity));
         checks.Children.Add(Action("Мои игры", ShowGameLibrary));
         checks.Children.Add(Action("Запись игровой сессии", ShowGameCapture));
         checks.Children.Add(Action("Программы и магазин", ShowPackageCatalog));
