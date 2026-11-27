@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
 
 namespace DesktopPet;
@@ -33,6 +34,8 @@ internal sealed partial class ActionPickerWindow : Window
     };
     internal CustomAction? Result { get; private set; }
     internal ActionPickerWindow(Window owner) { Owner = owner; InitializeComponent(); FilterChanged(this, null!); }
+    private void HeaderMouseDown(object sender, MouseButtonEventArgs e) { if (e.ChangedButton == MouseButton.Left && e.ClickCount == 1) DragMove(); }
+    private void CloseClick(object sender, RoutedEventArgs e) => Close();
     private void FilterChanged(object sender, TextChangedEventArgs e)
     {
         if (_choices == null || _filter == null) return;
