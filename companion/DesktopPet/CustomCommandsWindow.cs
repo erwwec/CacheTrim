@@ -168,7 +168,7 @@ internal sealed partial class CustomCommandsWindow : Window
     private void ShowPowerShell_Click(object sender, RoutedEventArgs e) => ShowInput("powershell", "Команда PowerShell: выполняется с правами Клода", "Введи команду PowerShell в одну строку");
     private void AddSound_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Title = "Выбери звук", Filter = "Звуковые файлы (*.wav;*.mp3)|*.wav;*.mp3" };
+        var dialog = new OpenFileDialog { Title = "Выбери звук WAV или MP3 до 10 минут", Filter = "Звуковые файлы (*.wav;*.mp3)|*.wav;*.mp3" };
         if (dialog.ShowDialog(this) == true) { _actions.Items.Add(new CustomAction("sound", dialog.FileName)); _actions.SelectedIndex = _actions.Items.Count - 1; UpdateEmptyActions(); }
     }
     private void AddLink_Click(object sender, RoutedEventArgs e)

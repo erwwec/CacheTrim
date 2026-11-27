@@ -52,7 +52,7 @@ public partial class MainWindow
     }
     private void CustomSchedule_Tick(object? sender, EventArgs e)
     {
-        if (!_experimentalModel || _isClosing || _customEditorOpen || _customCommandPending || _customCommandsError != null) return;
+        if (!IsLoaded || !_experimentalModel || _isClosing || _customEditorOpen || _customCommandPending || _customCommandsError != null) return;
         var now = DateTime.Now;
         try
         {
