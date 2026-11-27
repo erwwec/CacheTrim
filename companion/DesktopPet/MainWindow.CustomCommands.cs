@@ -93,10 +93,10 @@ public partial class MainWindow
         CancellationTokenSource? cancellation = null;
         try
         {
-            if (c.Confirm || fromVoice || IsElevated())
+            if (c.Confirm || fromVoice || IsElevated() || c.Actions.Any(a => a.Type is "keys" or "window"))
             {
                 string actions = string.Join(Environment.NewLine, c.Actions.Select((a, i) => (i + 1) + ". " + a));
-                string prompt = (scheduled ? "По расписанию: выполнить" : "Выполнить") + " команду «" + c.Name + "»?\n\n" + actions + "\n\nПрограммы и скрипты могут получить права Клода, включая права администратора. Выполняй только доверенные действия.";
+                string prompt = (scheduled ? "По расписанию: выполнить" : "Выполнить") + " команду «" + c.Name + "»?\n\n" + actions + "\n\nПрограммы и скрипты могут получить права Клода, включая права администратора. Для клавиш и окон нужно переключиться на нужное окно после подтверждения. Выполняй только доверенные действия.";
                 if (MessageBox.Show(_assistantWindow ?? this, prompt, "Подтверждение своей команды", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) { AssistantVoiceStatus.Text = "Команда отменена."; return; }
             }
             if (_isClosing || !_experimentalModel) return;
@@ -111,9 +111,18 @@ public partial class MainWindow
         finally { if (ReferenceEquals(_customCommandCancellation, cancellation)) _customCommandCancellation = null; cancellation?.Dispose(); _customCommandPending = false; if (!_isClosing) CustomStopButton.IsEnabled = false; }
     }
     private void CancelCustomCommand_Click(object sender, RoutedEventArgs e) => _customCommandCancellation?.Cancel();
-    private Task RunCustomActionAsync(CustomAction action, CancellationToken token)
+    private async Task RunCustomActionAsync(CustomAction action, CancellationToken token)
     {
         if (_isClosing || !_experimentalModel) throw new OperationCanceledException(token);
-        return CustomCommandActions.PerformAsync(action, token);
+        if (action.Type is "keys" or "window")
+        {
+            for (int seconds = 5; seconds > 0; seconds--)
+            {
+                AssistantVoiceStatus.Text = $"Переключись на нужное окно: действие через {seconds} с. Можно остановить цепочку.";
+                await Task.Delay(1000, token);
+            }
+            if (_isClosing || !_experimentalModel) throw new OperationCanceledException(token);
+        }
+        await CustomCommandActions.PerformAsync(action, token);
     }
 }

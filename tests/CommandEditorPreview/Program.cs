@@ -31,6 +31,9 @@ internal static class Preview
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Left = 20; window.Top = 20;
         window.Show();
+        var pickerType = assembly.GetType("DesktopPet.ActionPickerWindow")!;
+        var picker = (Window)Activator.CreateInstance(pickerType, BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { window }, null)!;
+        picker.WindowStartupLocation = WindowStartupLocation.Manual; picker.Left = 60; picker.Top = 60; picker.Show();
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         timer.Tick += (_, _) =>
         {
@@ -40,6 +43,15 @@ internal static class Preview
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             var output = Path.GetFullPath(args[0]); Directory.CreateDirectory(Path.GetDirectoryName(output)!);
             using (var stream = File.Create(output)) encoder.Save(stream);
+            if (args.Length > 1)
+            {
+                picker.UpdateLayout();
+                var pickerBitmap = new RenderTargetBitmap((int)picker.ActualWidth, (int)picker.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                pickerBitmap.Render(picker); var pickerEncoder = new PngBitmapEncoder(); pickerEncoder.Frames.Add(BitmapFrame.Create(pickerBitmap));
+                var pickerOutput = Path.GetFullPath(args[1]); Directory.CreateDirectory(Path.GetDirectoryName(pickerOutput)!);
+                using var pickerStream = File.Create(pickerOutput); pickerEncoder.Save(pickerStream);
+            }
+            picker.Close();
             // Clear the sample so closing does not prompt to discard it.
             ((TextBox)Field("_name")).Clear(); ((TextBox)Field("_phrases")).Clear(); actions.Items.Clear();
             application.Shutdown();
