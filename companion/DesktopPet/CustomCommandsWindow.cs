@@ -11,6 +11,23 @@ namespace DesktopPet;
 
 internal sealed partial class CustomCommandsWindow : Window
 {
+    // Templates are inert until the user explicitly saves them as a custom command.
+    private static readonly CustomCommand[] Templates = {
+        new("Яндекс", new() { "открой яндекс" }, true, new() { new("url", "https://yandex.ru/") }),
+        new("YouTube", new() { "открой ютуб" }, true, new() { new("url", "https://www.youtube.com/") }),
+        new("ВКонтакте", new() { "открой вконтакте" }, true, new() { new("url", "https://vk.com/") }),
+        new("Переводчик", new() { "открой переводчик" }, true, new() { new("url", "https://translate.google.com/") }),
+        new("Google", new() { "открой гугл" }, true, new() { new("url", "https://www.google.com/") }),
+        new("Закрыть окно", new() { "закрой окно" }, true, new() { new("window", "close") }),
+        new("На весь экран (F11)", new() { "на весь экран" }, true, new() { new("keys", "F11") }),
+        new("Развернуть окно", new() { "разверни окно" }, true, new() { new("window", "maximize") }),
+        new("Нормальное окно", new() { "восстанови окно" }, true, new() { new("window", "restore") }),
+        new("Свернуть окно", new() { "сверни окно" }, true, new() { new("window", "minimize") }),
+        new("Вставить", new() { "вставь" }, true, new() { new("keys", "Ctrl+V") }),
+        new("Скопировать", new() { "скопируй" }, true, new() { new("keys", "Ctrl+C") }),
+        new("Отменить ввод", new() { "отмени ввод" }, true, new() { new("keys", "Ctrl+Z") }),
+        new("Другое окно", new() { "другое окно" }, true, new() { new("keys", "Alt+Tab") })
+    };
     private readonly string _path;
     private List<CustomCommand> _commands;
     private int _editing = -1;
@@ -35,19 +52,20 @@ internal sealed partial class CustomCommandsWindow : Window
         var shown = _commands.Where(c => query.Length == 0 || c.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) || c.Phrases.Any(p => p.Contains(query, StringComparison.CurrentCultureIgnoreCase)) || c.OptionalPhrases.Any(p => p.Contains(query, StringComparison.CurrentCultureIgnoreCase))).ToList();
         _list.ItemsSource = null;
         _list.ItemsSource = shown;
+        _templates.ItemsSource = Templates.Where(c => query.Length == 0 || c.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) || c.Phrases.Any(p => p.Contains(query, StringComparison.CurrentCultureIgnoreCase))).ToArray();
         EmptyCommands.Visibility = shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyTitle.Text = _commands.Count == 0 ? "Пока нет своих команд" : "Ничего не найдено";
         EmptyHint.Text = _commands.Count == 0 ? "Создай команду и добавь действия" : "Измени поисковый запрос";
         _loading = false;
     }
 
-    private void SearchCommands_Changed(object sender, TextChangedEventArgs e) { if (!_loading && _list != null && EmptyCommands != null) RefreshList(); }
+    private void SearchCommands_Changed(object sender, TextChangedEventArgs e) { if (!_loading && _list != null && _templates != null && EmptyCommands != null) RefreshList(); }
 
     private void ClearEditor()
     {
         _loading = true;
         _editing = -1;
-        _list.SelectedIndex = -1;
+        _list.SelectedIndex = -1; _templates.SelectedIndex = -1;
         _name.Clear(); _phrases.Clear(); _optionalPhrases.Clear(); _enabled.IsChecked = true;
         _confirm.IsChecked = true; _scheduleEnabled.IsChecked = false; _scheduleTime.Text = "09:00"; _scheduleDays.SelectedIndex = 0;
         _actions.Items.Clear(); _url.Clear(); LinkEditor.Visibility = Visibility.Collapsed;
@@ -121,6 +139,14 @@ internal sealed partial class CustomCommandsWindow : Window
     {
         if (!_loading && _list.SelectedItem is CustomCommand selected) { int index = _commands.IndexOf(selected); if (index >= 0) { ShowCommand(index); ShowEditor(); } }
     }
+    private void Template_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || _templates.SelectedItem is not CustomCommand template) return;
+        ClearEditor();
+        _name.Text = template.Name; _phrases.Text = string.Join(Environment.NewLine, template.Phrases);
+        foreach (var action in template.Actions) _actions.Items.Add(action);
+        EditorHeading.Text = "ШАБЛОН — СОХРАНИ КОМАНДУ"; UpdateEmptyActions(); ShowEditor();
+    }
     private void UpdateEmptyActions() { if (EmptyActions != null && _actions != null) EmptyActions.Visibility = _actions.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; }
     private void Actions_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateEmptyActions();
     private void MoveAction(int delta)
@@ -140,6 +166,15 @@ internal sealed partial class CustomCommandsWindow : Window
             if (index >= 0) _actions.Items.RemoveAt(index);
         }
         UpdateEmptyActions();
+    }
+    private void AddAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(_url.Text)) { _status.Text = "Сначала добавь действие или очисти поле."; return; }
+        var picker = new ActionPickerWindow(this);
+        if (picker.ShowDialog() == true && picker.Result is CustomAction action)
+        {
+            _actions.Items.Add(action); _actions.SelectedIndex = _actions.Items.Count - 1; _status.Text = ""; UpdateEmptyActions();
+        }
     }
     private void AddProgram_Click(object sender, RoutedEventArgs e)
     {

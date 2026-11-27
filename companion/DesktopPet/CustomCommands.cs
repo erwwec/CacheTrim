@@ -12,7 +12,7 @@ namespace DesktopPet;
 
 internal sealed record CustomAction(string Type, string Target)
 {
-    [JsonIgnore] public string DisplayLabel => Type switch { "app" => "▣  Запустить программу", "file" => "▤  Открыть файл", "folder" => "▣  Открыть папку", "url" => "◎  Открыть ссылку", "search" => "⌕  Поиск в интернете", "delay" => "◷  Пауза (сек.)", "sound" => "♫  Проиграть звук", "cmd" => "▸  Команда CMD", "powershell" => "▸  PowerShell", _ => "Действие" };
+    [JsonIgnore] public string DisplayLabel => Type switch { "app" => "▣  Запустить программу", "file" => "▤  Открыть файл", "folder" => "▣  Открыть папку", "url" => "◎  Открыть ссылку", "search" => "⌕  Поиск в интернете", "search_first" => "⌕  Первый результат", "keys" => "⌨  Нажать клавиши", "window" => "▣  Окно: " + (Target switch { "close" => "закрыть", "minimize" => "свернуть", "maximize" => "развернуть", "restore" => "восстановить", _ => "действие" }), "delay" => "◷  Пауза (сек.)", "sound" => "♫  Проиграть звук", "cmd" => "▸  Команда CMD", "powershell" => "▸  PowerShell", _ => "Действие" };
     public override string ToString() => DisplayLabel + ": " + Target;
 }
 internal sealed record CustomCommand(string Name, List<string> Phrases, bool Enabled, List<CustomAction> Actions)
@@ -93,7 +93,9 @@ internal static class CustomCommands
                     case "delay":
                         if (!int.TryParse(target, NumberStyles.None, CultureInfo.InvariantCulture, out int seconds) || seconds is < 1 or > 3600) throw new InvalidDataException("Пауза: целое число от 1 до 3600 секунд.");
                         target = seconds.ToString(CultureInfo.InvariantCulture); break;
-                    case "search": if (target.Length > 300) throw new InvalidDataException("Поисковый запрос слишком длинный."); break;
+                    case "search": case "search_first": if (target.Length > 300) throw new InvalidDataException("Поисковый запрос слишком длинный."); break;
+                    case "keys": target = CustomKeyChord.Normalize(target); break;
+                    case "window": if (target is not ("close" or "minimize" or "maximize" or "restore")) throw new InvalidDataException("Неизвестное действие с окном."); break;
                     case "cmd": case "powershell": if (target.Length > 2000) throw new InvalidDataException("Команда должна быть не длиннее 2000 символов."); break;
                     default: throw new InvalidDataException("Неизвестный тип действия.");
                 }
@@ -183,5 +185,40 @@ internal static class CustomCommandExecutor
     internal static async Task RunAsync(IEnumerable<CustomAction> actions, Func<CustomAction, CancellationToken, Task> perform, CancellationToken token)
     {
         foreach (var action in actions) { token.ThrowIfCancellationRequested(); await perform(action, token); }
+    }
+}
+
+// Deliberately restricted keyboard grammar: one regular key and up to three modifiers.
+internal static class CustomKeyChord
+{
+    private static readonly Dictionary<string, ushort> Named = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Enter"] = 0x0D, ["Tab"] = 0x09, ["Escape"] = 0x1B, ["Space"] = 0x20,
+        ["Backspace"] = 0x08, ["Delete"] = 0x2E, ["Insert"] = 0x2D,
+        ["Home"] = 0x24, ["End"] = 0x23, ["PageUp"] = 0x21, ["PageDown"] = 0x22,
+        ["Left"] = 0x25, ["Up"] = 0x26, ["Right"] = 0x27, ["Down"] = 0x28
+    };
+    internal static string Normalize(string input)
+    {
+        var parts = input.Split('+', StringSplitOptions.TrimEntries);
+        if (parts.Length is < 1 or > 4 || parts.Any(string.IsNullOrEmpty)) throw new InvalidDataException("Укажи сочетание, например Ctrl+Shift+S или F11.");
+        var modifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < parts.Length - 1; i++)
+            if (!new[] { "Ctrl", "Alt", "Shift" }.Contains(parts[i], StringComparer.OrdinalIgnoreCase) || !modifiers.Add(parts[i]))
+                throw new InvalidDataException("Перед клавишей доступны Ctrl, Alt и Shift без повторов.");
+        string key = parts[^1];
+        if (key.Length == 1 && char.IsAsciiLetterOrDigit(key[0])) key = key.ToUpperInvariant();
+        else if (key.Length >= 2 && (key[0] is 'f' or 'F') && int.TryParse(key[1..], out int f) && f is >= 1 and <= 12) key = "F" + f;
+        else if (Named.Keys.FirstOrDefault(k => k.Equals(key, StringComparison.OrdinalIgnoreCase)) is string named) key = named;
+        else throw new InvalidDataException("Поддерживаются буквы A–Z, цифры, F1–F12 и клавиши Enter, Tab, Escape, Space, Delete, стрелки и навигации.");
+        return string.Join("+", new[] { "Ctrl", "Alt", "Shift" }.Where(modifiers.Contains).Append(key));
+    }
+    internal static ushort[] VirtualKeys(string input)
+    {
+        var parts = Normalize(input).Split('+'); var result = new List<ushort>();
+        foreach (var mod in parts.Take(parts.Length - 1)) result.Add(mod switch { "Ctrl" => (ushort)0x11, "Alt" => (ushort)0x12, _ => (ushort)0x10 });
+        string key = parts[^1];
+        result.Add(key.Length == 1 ? (ushort)key[0] : key[0] == 'F' && int.TryParse(key[1..], out int f) ? (ushort)(0x70 + f - 1) : Named[key]);
+        return result.ToArray();
     }
 }
