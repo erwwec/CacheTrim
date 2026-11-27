@@ -25,6 +25,9 @@ internal static class CustomCommandActions
                 if (!Directory.Exists(a.Target)) throw new DirectoryNotFoundException("Папка не найдена: " + a.Target);
                 Process.Start(new ProcessStartInfo { FileName = a.Target, UseShellExecute = true }); break;
             case "url": Process.Start(new ProcessStartInfo { FileName = a.Target, UseShellExecute = true }); break;
+            case "search_first": Process.Start(new ProcessStartInfo { FileName = "https://www.google.com/search?btnI=1&q=" + Uri.EscapeDataString(a.Target), UseShellExecute = true }); break;
+            case "keys": InteractiveCommandActions.SendKeys(a.Target); break;
+            case "window": InteractiveCommandActions.WindowAction(a.Target); break;
             case "search": Process.Start(new ProcessStartInfo { FileName = "https://www.google.com/search?q=" + Uri.EscapeDataString(a.Target), UseShellExecute = true }); break;
             case "cmd": case "powershell":
                 string system = Environment.GetFolderPath(Environment.SpecialFolder.System);
