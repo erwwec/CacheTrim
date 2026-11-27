@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign', 'feat/commands-actions']
   pull_request:
     branches: [main]
 
@@ -159,6 +159,11 @@ jobs:
         run: |
           dotnet run --project .\tests\CustomCommandTests\CustomCommandTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Custom command safety tests failed' }
+      - name: Test custom action execution on Windows
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CustomActionWindowsTests\CustomActionWindowsTests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Custom action execution tests failed' }
       - name: Test V2 assistant command allowlist
         shell: pwsh
         run: |
@@ -212,7 +217,7 @@ jobs:
           retention-days: 14
 
   visual-preview:
-    if: github.ref == 'refs/heads/feat/commands-redesign' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/feat/commands-redesign' || github.ref == 'refs/heads/feat/commands-actions') && github.event_name == 'push'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -227,6 +232,8 @@ jobs:
           dotnet run --project .\tests\CommandEditorPreview\CommandEditorPreview.csproj -c Release -- docs/previews/custom-commands.png
           if ($LASTEXITCODE -ne 0) { throw 'Preview failed' }
       - name: Commit preview image
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
@@ -236,6 +243,6 @@ jobs:
           if ($LASTEXITCODE -eq 1) {
             git commit -m 'Add command editor preview [skip ci]'
             if ($LASTEXITCODE -ne 0) { throw 'Preview commit failed' }
-            git push origin HEAD:feat/commands-redesign
+            git push origin "HEAD:$env:TARGET_BRANCH"
             if ($LASTEXITCODE -ne 0) { throw 'Preview push failed' }
           }
