@@ -35,6 +35,9 @@ try {
  var monday=new DateTime(2026,11,23,9,30,10); var sunday=new DateTime(2026,11,22,9,30,10);
  Check(CustomCommands.IsDue(advanced,monday,null) && !CustomCommands.IsDue(advanced,sunday,null),"weekday schedule");
  Check(!CustomCommands.IsDue(advanced,monday.AddMinutes(1),null) && !CustomCommands.IsDue(advanced,monday,"2026-11-23"),"exact minute and once per day");
+ var missingIdPath=Path.Combine(dir,"missing-id.json");
+ File.WriteAllText(missingIdPath,"[{\"Name\":\"Scheduled\",\"Phrases\":[\"unique phrase\"],\"Enabled\":true,\"ScheduleEnabled\":true,\"Actions\":[{\"Type\":\"url\",\"Target\":\"https://example.org/\"}]}]");
+ Reject(()=>CustomCommands.Load(missingIdPath),"scheduled command without stable id is not loaded");
  var schedulePath=Path.Combine(dir,"schedule.json"); var tracker=new CustomScheduleTracker(schedulePath); Check(tracker.Due(advanced,monday),"schedule initially due"); tracker.Mark(advanced,monday);
  Check(!new CustomScheduleTracker(schedulePath).Due(advanced,monday),"schedule deduplicates after restart");
  File.WriteAllText(schedulePath,"{broken"); Reject(()=>new CustomScheduleTracker(schedulePath),"corrupt schedule is not overwritten"); Check(File.ReadAllText(schedulePath)=="{broken","corrupt schedule preserved");

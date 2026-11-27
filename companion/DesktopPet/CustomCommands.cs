@@ -130,7 +130,9 @@ internal static class CustomCommands
         try
         {
             if (new FileInfo(path).Length > 1024 * 1024) throw new InvalidDataException("Файл слишком большой.");
-            return Validate(JsonSerializer.Deserialize<List<CustomCommand>>(File.ReadAllText(path)) ?? throw new InvalidDataException("Файл пуст."));
+            var stored = JsonSerializer.Deserialize<List<CustomCommand>>(File.ReadAllText(path)) ?? throw new InvalidDataException("Файл пуст.");
+            if (stored.Any(c => c != null && c.ScheduleEnabled && string.IsNullOrEmpty(c.Id))) throw new InvalidDataException("У команды с расписанием нет постоянного идентификатора; автозапуск остановлен.");
+            return Validate(stored);
         }
         catch (Exception ex) when (ex is JsonException or InvalidDataException or ArgumentException or NotSupportedException)
         { throw new InvalidDataException("Не удалось прочитать свои команды. Файл не будет перезаписан: " + ex.Message, ex); }
