@@ -103,6 +103,15 @@ internal static class Program
             var picker = (Window)Activator.CreateInstance(pickerType, BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { assistantWindow }, null)!;
             object PickerField(string n) => pickerType.GetField(n, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(picker)!;
             var filter = (System.Windows.Controls.TextBox)PickerField("_filter");
+            filter.ApplyTemplate();
+            var fieldBorder = (System.Windows.Controls.Border)filter.Template.FindName("Field", filter);
+            Check(fieldBorder != null && fieldBorder.CornerRadius.TopLeft >= 8, "action picker search field is rounded");
+            var addButton = (System.Windows.Controls.Button)PickerField("_add"); addButton.ApplyTemplate();
+            var buttonBorder = (System.Windows.Controls.Border)addButton.Template.FindName("Surface", addButton);
+            Check(buttonBorder != null && buttonBorder.CornerRadius.TopLeft >= 8, "action picker button is rounded");
+            var scrollBar = new System.Windows.Controls.Primitives.ScrollBar { Style = (Style)picker.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
+            scrollBar.ApplyTemplate();
+            Check(scrollBar.Template.FindName("PART_Track", scrollBar) != null, "action picker uses styled scrolling");
             var choices = (System.Windows.Controls.ListBox)PickerField("_choices");
             filter.Text = "сочетание"; Check(choices.Items.Count == 1, "action picker searches categories and actions");
             ((System.Windows.Controls.TextBox)PickerField("_parameter")).Text = "ctrl+shift+s";

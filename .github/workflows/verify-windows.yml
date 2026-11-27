@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign', 'feat/commands-actions', 'feat/commands-complete']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign', 'feat/commands-actions', 'feat/commands-complete', 'fix/commands-menu-design']
   pull_request:
     branches: [main]
 
@@ -217,7 +217,7 @@ jobs:
           retention-days: 14
 
   visual-preview:
-    if: (github.ref == 'refs/heads/feat/commands-redesign' || github.ref == 'refs/heads/feat/commands-actions' || github.ref == 'refs/heads/feat/commands-complete') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/feat/commands-redesign' || github.ref == 'refs/heads/feat/commands-actions' || github.ref == 'refs/heads/feat/commands-complete' || github.ref == 'refs/heads/fix/commands-menu-design') && github.event_name == 'push'
     runs-on: windows-latest
     permissions:
       contents: write
