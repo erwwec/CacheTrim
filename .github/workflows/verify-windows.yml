@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign']
   pull_request:
     branches: [main]
 
@@ -210,3 +210,32 @@ jobs:
           path: dist/experimental-test/
           if-no-files-found: error
           retention-days: 14
+
+  visual-preview:
+    if: github.ref == 'refs/heads/feat/commands-redesign' && github.event_name == 'push'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Render the actual command editor with example data
+        shell: pwsh
+        run: |
+          dotnet run --project .\tests\CommandEditorPreview\CommandEditorPreview.csproj -c Release -- docs/previews/custom-commands.png
+          if ($LASTEXITCODE -ne 0) { throw 'Preview failed' }
+      - name: Commit preview image
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- docs/previews/custom-commands.png
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 1) {
+            git commit -m 'Add command editor preview [skip ci]'
+            if ($LASTEXITCODE -ne 0) { throw 'Preview commit failed' }
+            git push origin HEAD:feat/commands-redesign
+            if ($LASTEXITCODE -ne 0) { throw 'Preview push failed' }
+          }
