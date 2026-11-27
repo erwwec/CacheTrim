@@ -31,7 +31,7 @@
         <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/></Style>
         <Style TargetType="TextBox">
             <Setter Property="Foreground" Value="#F0F5F8"/><Setter Property="Background" Value="#101A21"/><Setter Property="BorderBrush" Value="#344955"/><Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,9"/><Setter Property="CaretBrush" Value="#F0F5F8"/><Setter Property="SelectionBrush" Value="#258BB2"/>
+            <Setter Property="Padding" Value="12,4"/><Setter Property="CaretBrush" Value="#F0F5F8"/><Setter Property="SelectionBrush" Value="#258BB2"/>
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
                 <Border x:Name="Shell" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
                     <Grid><ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/><TextBlock x:Name="Hint" Text="{TemplateBinding Tag}" Foreground="#8294A0" Margin="{TemplateBinding Padding}" IsHitTestVisible="False" Visibility="Collapsed"/></Grid>
@@ -93,7 +93,7 @@
                             <Grid x:Name="LinkEditor" Visibility="Collapsed" Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="_url" Tag="https://example.com" MinHeight="40" AutomationProperties.Name="Ссылка"/><Button Grid.Column="1" Content="Добавить" Margin="8,0,0,0" Click="AddLink_Click"/></Grid>
                             <TextBlock Text="Фразы для активации" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,4"/>
                             <TextBlock Text="Одна фраза на строку, например: открой мою игру" Foreground="#9DB0BD" FontSize="12" Margin="0,0,0,8"/>
-                            <TextBox x:Name="_phrases" Tag="Напиши фразы для запуска команды" AcceptsReturn="True" Height="64" MaxLength="810" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" AutomationProperties.Name="Фразы для активации"/>
+                            <TextBox x:Name="_phrases" Tag="Напиши фразы для запуска команды" AcceptsReturn="True" Height="70" MaxLength="810" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" AutomationProperties.Name="Фразы для активации"/>
                             <TextBlock Text="Голос: кнопка «Слушать одну команду». Доступность зависит от слов локальной модели. Расписание и вызов «Джарвис» пока не поддерживаются." Foreground="#91A8B3" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
                         </StackPanel>
                     </ScrollViewer>
