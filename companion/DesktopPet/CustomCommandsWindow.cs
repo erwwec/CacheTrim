@@ -15,6 +15,7 @@ internal sealed partial class CustomCommandsWindow : Window
     private List<CustomCommand> _commands;
     private int _editing = -1;
     private bool _loading;
+    private string _pendingType = "url";
 
     internal CustomCommandsWindow(Window owner, string path, List<CustomCommand> commands)
     {
@@ -41,7 +42,8 @@ internal sealed partial class CustomCommandsWindow : Window
         _loading = true;
         _editing = -1;
         _list.SelectedIndex = -1;
-        _name.Clear(); _phrases.Clear(); _enabled.IsChecked = true;
+        _name.Clear(); _phrases.Clear(); _optionalPhrases.Clear(); _enabled.IsChecked = true;
+        _confirm.IsChecked = true; _scheduleEnabled.IsChecked = false; _scheduleTime.Text = "09:00"; _scheduleDays.SelectedIndex = 0;
         _actions.Items.Clear(); _url.Clear(); LinkEditor.Visibility = Visibility.Collapsed;
         EditorHeading.Text = "НОВАЯ КОМАНДА";
         DeleteButton.Visibility = Visibility.Collapsed;
@@ -59,6 +61,9 @@ internal sealed partial class CustomCommandsWindow : Window
         _name.Text = command.Name;
         _phrases.Text = string.Join(Environment.NewLine, command.Phrases);
         _enabled.IsChecked = command.Enabled;
+        _confirm.IsChecked = command.Confirm; _optionalPhrases.Text = string.Join(Environment.NewLine, command.OptionalPhrases);
+        _scheduleEnabled.IsChecked = command.ScheduleEnabled; _scheduleTime.Text = command.ScheduleTime;
+        _scheduleDays.SelectedIndex = Math.Max(0, Array.IndexOf(CustomCommands.ScheduleOptions, command.ScheduleDays));
         _actions.Items.Clear();
         foreach (var action in command.Actions) _actions.Items.Add(action);
         _url.Clear(); LinkEditor.Visibility = Visibility.Collapsed;
@@ -70,13 +75,15 @@ internal sealed partial class CustomCommandsWindow : Window
     }
 
     private List<string> Phrases() => _phrases.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    private List<string> OptionalPhrases() => _optionalPhrases.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    private string ScheduleDays() => (_scheduleDays.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "daily";
     private bool HasUnsaved()
     {
         if (!string.IsNullOrWhiteSpace(_url.Text)) return true;
         if (_editing < 0 || _editing >= _commands.Count)
-            return !string.IsNullOrWhiteSpace(_name.Text) || Phrases().Count > 0 || _actions.Items.Count > 0 || _enabled.IsChecked != true;
+            return !string.IsNullOrWhiteSpace(_name.Text) || Phrases().Count > 0 || OptionalPhrases().Count > 0 || _actions.Items.Count > 0 || _enabled.IsChecked != true || _confirm.IsChecked != true || _scheduleEnabled.IsChecked == true || _scheduleTime.Text != "09:00" || ScheduleDays() != "daily";
         var c = _commands[_editing];
-        return _name.Text != c.Name || !Phrases().SequenceEqual(c.Phrases) || (_enabled.IsChecked == true) != c.Enabled || !_actions.Items.Cast<CustomAction>().SequenceEqual(c.Actions);
+        return _name.Text != c.Name || !Phrases().SequenceEqual(c.Phrases) || !OptionalPhrases().SequenceEqual(c.OptionalPhrases) || (_enabled.IsChecked == true) != c.Enabled || (_confirm.IsChecked == true) != c.Confirm || (_scheduleEnabled.IsChecked == true) != c.ScheduleEnabled || _scheduleTime.Text != c.ScheduleTime || ScheduleDays() != c.ScheduleDays || !_actions.Items.Cast<CustomAction>().SequenceEqual(c.Actions);
     }
     private bool ConfirmDiscard() => !HasUnsaved() || MessageBox.Show(this, "Отменить несохранённые изменения?", "Свои команды", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
     protected override void OnClosing(CancelEventArgs e)
@@ -133,22 +140,58 @@ internal sealed partial class CustomCommandsWindow : Window
         var dialog = new OpenFileDialog { Title = "Выбери программу", Filter = "Программы (*.exe)|*.exe" };
         if (dialog.ShowDialog(this) == true) { _actions.Items.Add(new CustomAction("app", dialog.FileName)); _actions.SelectedIndex = _actions.Items.Count - 1; UpdateEmptyActions(); }
     }
-    private void ShowLink_Click(object sender, RoutedEventArgs e) { LinkEditor.Visibility = Visibility.Visible; _url.Focus(); }
+    private void AddFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Title = "Выбери файл", Filter = "Все файлы (*.*)|*.*" };
+        if (dialog.ShowDialog(this) == true) { _actions.Items.Add(new CustomAction("file", dialog.FileName)); _actions.SelectedIndex = _actions.Items.Count - 1; UpdateEmptyActions(); }
+    }
+    private void AddFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = "Выбери папку" };
+        if (dialog.ShowDialog(this) == true) { _actions.Items.Add(new CustomAction("folder", dialog.FolderName)); _actions.SelectedIndex = _actions.Items.Count - 1; UpdateEmptyActions(); }
+    }
+    private void ShowInput(string type, string title, string hint)
+    {
+        if (!string.IsNullOrWhiteSpace(_url.Text)) { _status.Text = "Сначала добавь действие или очисти поле."; return; }
+        _pendingType = type; ActionEntryTitle.Text = title; _url.Tag = hint; _url.Clear(); LinkEditor.Visibility = Visibility.Visible; _url.Focus();
+    }
+    private void ShowLink_Click(object sender, RoutedEventArgs e) => ShowInput("url", "Адрес ссылки (http или https)", "https://example.com");
+    private void ShowSearch_Click(object sender, RoutedEventArgs e) => ShowInput("search", "Поиск Google: запрос откроется в браузере", "Например: расписание поездов");
+    private void ShowDelay_Click(object sender, RoutedEventArgs e) => ShowInput("delay", "Пауза в секундах (1–3600)", "Например: 5");
+    private void ShowCmd_Click(object sender, RoutedEventArgs e) => ShowInput("cmd", "Команда CMD: выполняется с правами Клода", "Введи команду CMD в одну строку");
+    private void ShowPowerShell_Click(object sender, RoutedEventArgs e) => ShowInput("powershell", "Команда PowerShell: выполняется с правами Клода", "Введи команду PowerShell в одну строку");
+    private void AddSound_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Title = "Выбери звук", Filter = "Звуковые файлы (*.wav;*.mp3)|*.wav;*.mp3" };
+        if (dialog.ShowDialog(this) == true) { _actions.Items.Add(new CustomAction("sound", dialog.FileName)); _actions.SelectedIndex = _actions.Items.Count - 1; UpdateEmptyActions(); }
+    }
     private void AddLink_Click(object sender, RoutedEventArgs e)
     {
-        string value = _url.Text.Trim();
-        if (value.Length > 2048 || !Uri.TryCreate(value, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) || string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo))
-        { _status.Text = "Введи ссылку http или https без логина и пароля."; return; }
-        _actions.Items.Add(new CustomAction("url", uri.AbsoluteUri)); _actions.SelectedIndex = _actions.Items.Count - 1;
-        _url.Clear(); LinkEditor.Visibility = Visibility.Collapsed; _status.Text = ""; UpdateEmptyActions();
+        try
+        {
+            var action = new CustomAction(_pendingType, _url.Text.Trim());
+            var checkedAction = CustomCommands.Validate(new[] { new CustomCommand("Проверка", new() { "проверка действия" }, true, new() { action }) })[0].Actions[0];
+            _actions.Items.Add(checkedAction); _actions.SelectedIndex = _actions.Items.Count - 1;
+            _url.Clear(); LinkEditor.Visibility = Visibility.Collapsed; _status.Text = ""; UpdateEmptyActions();
+        }
+        catch (Exception ex) { _status.Text = "Не удалось добавить действие: " + ex.Message; }
     }
     private void Save_Click(object sender, RoutedEventArgs e) => SaveEditor();
     private void SaveEditor()
     {
         try
         {
-            if (!string.IsNullOrWhiteSpace(_url.Text)) { _status.Text = "Сначала добавь ссылку в цепочку или очисти поле."; return; }
-            var command = new CustomCommand(_name.Text, Phrases(), _enabled.IsChecked == true, _actions.Items.Cast<CustomAction>().ToList());
+            if (!string.IsNullOrWhiteSpace(_url.Text)) { _status.Text = "Сначала добавь действие в цепочку или очисти поле."; return; }
+            var command = new CustomCommand(_name.Text, Phrases(), _enabled.IsChecked == true, _actions.Items.Cast<CustomAction>().ToList())
+            {
+                Id = _editing >= 0 && _editing < _commands.Count ? _commands[_editing].Id : "",
+                Confirm = _confirm.IsChecked == true, OptionalPhrases = OptionalPhrases(), ScheduleEnabled = _scheduleEnabled.IsChecked == true,
+                ScheduleTime = _scheduleTime.Text.Trim(), ScheduleDays = ScheduleDays()
+            };
+            if (!command.Confirm && (_editing < 0 || _commands[_editing].Confirm || !_commands[_editing].Actions.SequenceEqual(command.Actions) || (!_commands[_editing].ScheduleEnabled && command.ScheduleEnabled)))
+            {
+                if (MessageBox.Show(this, "Команда будет запускаться без подтверждения, в том числе по расписанию. Программы и скрипты получат права Клода, возможно администратора. Продолжить?", "Запуск без подтверждения", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            }
             var next = _commands.ToList(); int selected = _editing;
             if (selected >= 0 && selected < next.Count) next[selected] = command; else { selected = next.Count; next.Add(command); }
             CustomCommands.Save(_path, next); _commands = CustomCommands.Load(_path); RefreshList();

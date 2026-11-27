@@ -71,6 +71,17 @@ internal static class Program
             editorType.GetMethod("MoveAction", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, new object[] { -1 });
             Check(actionList.Items[0].ToString()!.Contains("example.com"), "editor reorders action cards");
             editorType.GetMethod("SaveEditor", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, null);
+            editorType.GetMethod("ShowDelay_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, new object[] { editor, new RoutedEventArgs() });
+            ((System.Windows.Controls.TextBox)Field("_url")).Text = "3";
+            editorType.GetMethod("AddLink_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, new object[] { editor, new RoutedEventArgs() });
+            Check(actionList.Items.Count == 3 && actionList.Items[2].ToString()!.Contains("Пауза"), "pause can be added through editor");
+            ((System.Windows.Controls.TextBox)Field("_optionalPhrases")).Text = "пожалуйста";
+            ((System.Windows.Controls.CheckBox)Field("_scheduleEnabled")).IsChecked = true;
+            ((System.Windows.Controls.TextBox)Field("_scheduleTime")).Text = "09:30";
+            ((System.Windows.Controls.ComboBox)Field("_scheduleDays")).SelectedIndex = 1;
+            editorType.GetMethod("SaveEditor", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(editor, null);
+            var stored = File.ReadAllText(customPath);
+            Check(stored.Contains("\"ScheduleEnabled\":true") && stored.Contains("09:30") && stored.Contains("weekdays") && stored.Contains("\"delay\""), "editor persists schedule and pause");
             var listTab = (System.Windows.Controls.Button)Field("ListTab");
             listTab.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             Check(((FrameworkElement)Field("ListView")).Visibility == Visibility.Visible, "saved commands have a separate list");
