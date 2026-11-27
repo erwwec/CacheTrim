@@ -8,6 +8,8 @@ namespace DesktopPet;
 
 internal sealed record CustomAction(string Type, string Target)
 {
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayLabel => Type == "app" ? "▣  Запустить программу" : "◎  Открыть ссылку";
     public override string ToString() => (Type == "app" ? "Запустить программу: " : "Открыть ссылку: ") + Target;
 }
 internal sealed record CustomCommand(string Name, List<string> Phrases, bool Enabled, List<CustomAction> Actions)
