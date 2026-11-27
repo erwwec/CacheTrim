@@ -37,7 +37,7 @@ public partial class MainWindow
                     if (_isClosing || !_experimentalModel || !ReferenceEquals(_voiceSession, session)) return;
                     StopVoice();
                     if (error != null) { AssistantVoiceStatus.Text = error; return; }
-                    if (!TryRunLocalPhrase(text, confidence)) AssistantVoiceStatus.Text = "Команда не распознана. Попробуй ещё раз или введи текст.";
+                    if (!TryRunLocalPhrase(text, confidence, true)) AssistantVoiceStatus.Text = "Команда не распознана. Попробуй ещё раз или введи текст.";
                 })); } catch (InvalidOperationException) { }
             });
             _voiceSession = session;

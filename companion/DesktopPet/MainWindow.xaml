@@ -217,8 +217,9 @@
                             <ComboBox x:Name="AssistantCommandSelector" SelectionChanged="AssistantCommandSelector_Changed" />
                             <TextBox x:Name="AssistantCommandText" MaxLength="80" ToolTip="Быстрая локальная команда" />
                             <Button Content="Выполнить текстовую команду" Click="AssistantText_Click" />
+                            <Button x:Name="CustomStopButton" Content="Остановить цепочку" IsEnabled="False" Click="CancelCustomCommand_Click" />
                             <Button x:Name="CustomCommandsButton" Content="Свои команды…" Click="CustomCommands_Click" />
-                            <TextBlock Text="Своя фраза может запускать программы и открывать ссылки после подтверждения. Для голоса нажми «Слушать одну команду»." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
+                            <TextBlock Text="Свои команды могут запускать программы, ссылки и скрипты. Остановка цепочки не закрывает уже запущенные программы." Foreground="#FFD2C1DF" TextWrapping="Wrap" Margin="0,4" />
                         </StackPanel>
                     </Expander>
                 </StackPanel>
