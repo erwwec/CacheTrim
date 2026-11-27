@@ -16,6 +16,17 @@ try {
  Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("url","javascript:alert(1)")}}}),"reject script links");
  Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("app",app+" --bad")}}}),"reject command arguments");
  if (OperatingSystem.IsWindows()) Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("app","//server/share/game.exe")}}}),"reject UNC paths after normalization");
+ var more=CustomCommands.Validate(new[]{command with {Actions=new(){new("keys","ctrl+shift+s"),new("keys","F11"),new("window","minimize"),new("search_first","новости")}}})[0];
+ Check(more.Actions[0].Target=="Ctrl+Shift+S" && more.Actions[2].Target=="minimize", "new actions validate and keyboard chord canonicalizes");
+ Check(CustomKeyChord.VirtualKeys("Ctrl+Shift+S").SequenceEqual(new ushort[]{0x11,0x10,0x53}), "modifier and key virtual codes");
+ Check(CustomKeyChord.VirtualKeys("Alt+Tab").SequenceEqual(new ushort[]{0x12,0x09}) && CustomKeyChord.VirtualKeys("F11").SequenceEqual(new ushort[]{0x7A}), "navigation and function key codes");
+ Reject(()=>CustomKeyChord.Normalize("Ctrl+Ctrl+A"),"duplicate modifiers rejected");
+ Reject(()=>CustomKeyChord.Normalize("Ctrl+A+B"),"multiple non-modifier keys rejected");
+ Reject(()=>CustomKeyChord.Normalize("Win+R"),"unsupported modifier rejected");
+ Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("window","kill")}}}),"unknown window action rejected");
+ Reject(()=>CustomCommands.Validate(new[]{command with {Actions=new(){new("search_first",new string('x',301))}}}),"overlong first-result query rejected");
+ var newPath=Path.Combine(dir,"new-actions.json"); CustomCommands.Save(newPath,new[]{more});
+ Check(CustomCommands.Load(newPath)[0].Actions.SequenceEqual(more.Actions), "new actions round-trip in existing format");
  // Historical JSON without new fields must retain the original confirmation policy.
  var oldPath=Path.Combine(dir,"old.json");
  File.WriteAllText(oldPath,"[{\"Name\":\"Старая\",\"Phrases\":[\"старая команда\"],\"Enabled\":true,\"Actions\":[{\"Type\":\"url\",\"Target\":\"https://example.org/\"}]}]");
