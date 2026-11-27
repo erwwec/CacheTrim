@@ -110,8 +110,8 @@
                     <TextBlock x:Name="_parameterLabel" Text="ПАРАМЕТРЫ" Foreground="#9AB1BD" FontSize="11" FontWeight="SemiBold"/>
                     <TextBlock x:Name="_hint" TextWrapping="Wrap" Margin="0,8,0,8" Foreground="#91AAB6" FontSize="12"/>
                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <TextBox x:Name="_parameter" MinHeight="40" MaxLength="2048" AutomationProperties.Name="Параметр действия"/>
-                        <Button x:Name="_browse" Grid.Column="1" Content="Обзор…" Margin="8,0,0,0" Padding="12,8" Click="BrowseClick" Visibility="Collapsed"/>
+                        <TextBox x:Name="_parameter" Height="42" MaxLength="2048" AutomationProperties.Name="Параметр действия"/>
+                        <Button x:Name="_browse" Grid.Column="1" Content="Обзор…" Height="42" Margin="8,0,0,0" Padding="12,8" Click="BrowseClick" Visibility="Collapsed"/>
                     </Grid>
                 </StackPanel>
             </Grid>
