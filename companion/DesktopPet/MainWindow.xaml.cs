@@ -114,6 +114,7 @@ public partial class MainWindow : Window
         AssistantProvider.SelectedIndex = _aiProviderIndex;
         AssistantSpeechProvider.SelectedIndex = _speechProviderIndex;
         RefreshCustomCommands();
+        StartCustomSchedule();
         AssistantKeyLabel.Text = "Ключ " + AiProviderConfig.Name(SelectedAiProvider);
         ModelSelector.SelectedIndex = _experimentalModel ? 1 : 0;
         AssistantOpenButton.Visibility = _experimentalModel ? Visibility.Visible : Visibility.Collapsed;
@@ -1182,6 +1183,7 @@ public partial class MainWindow : Window
         DisableWakeWord();
         StopVoice();
         StopCloud();
+        _customScheduleTimer.Stop(); _customCommandCancellation?.Cancel();
         _reminderTimer.Stop(); _motionTimer.Stop(); _audioTimer.Stop(); _platformScanTimer.Stop(); _lyricsTimer.Stop();
         _lyricsCancellation.Cancel(); _lyricsCancellation.Dispose(); _lyricsService?.Dispose();
         StopAudioCapture();
