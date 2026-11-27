@@ -86,6 +86,9 @@ internal static class Program
             listTab.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             Check(((FrameworkElement)Field("ListView")).Visibility == Visibility.Visible, "saved commands have a separate list");
             var savedList = (System.Windows.Controls.ListBox)Field("_list");
+            var search = (System.Windows.Controls.TextBox)Field("_searchCommands");
+            search.Text = "не существует"; Check(savedList.Items.Count == 0, "command search filters the list");
+            search.Text = "тест"; Check(savedList.Items.Count == 1, "command search finds title");
             savedList.SelectedIndex = 0;
             Check(((FrameworkElement)Field("EditorView")).Visibility == Visibility.Visible && ((System.Windows.Controls.TextBox)Field("_name")).Text == "Тест", "selecting a saved command opens the editor");
             editor.Close();

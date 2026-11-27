@@ -31,11 +31,17 @@ internal sealed partial class CustomCommandsWindow : Window
     private void RefreshList()
     {
         _loading = true;
+        string query = _searchCommands?.Text.Trim() ?? "";
+        var shown = _commands.Where(c => query.Length == 0 || c.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) || c.Phrases.Any(p => p.Contains(query, StringComparison.CurrentCultureIgnoreCase)) || c.OptionalPhrases.Any(p => p.Contains(query, StringComparison.CurrentCultureIgnoreCase))).ToList();
         _list.ItemsSource = null;
-        _list.ItemsSource = _commands;
-        EmptyCommands.Visibility = _commands.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _list.ItemsSource = shown;
+        EmptyCommands.Visibility = shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyTitle.Text = _commands.Count == 0 ? "Пока нет своих команд" : "Ничего не найдено";
+        EmptyHint.Text = _commands.Count == 0 ? "Создай команду и добавь действия" : "Измени поисковый запрос";
         _loading = false;
     }
+
+    private void SearchCommands_Changed(object sender, TextChangedEventArgs e) { if (!_loading && _list != null && EmptyCommands != null) RefreshList(); }
 
     private void ClearEditor()
     {
@@ -113,7 +119,7 @@ internal sealed partial class CustomCommandsWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) { if (ConfirmDiscard()) { ClearEditor(); ShowList(); } }
     private void Command_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_loading && _list.SelectedIndex >= 0) { ShowCommand(_list.SelectedIndex); ShowEditor(); }
+        if (!_loading && _list.SelectedItem is CustomCommand selected) { int index = _commands.IndexOf(selected); if (index >= 0) { ShowCommand(index); ShowEditor(); } }
     }
     private void UpdateEmptyActions() { if (EmptyActions != null && _actions != null) EmptyActions.Visibility = _actions.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed; }
     private void Actions_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateEmptyActions();
@@ -195,7 +201,7 @@ internal sealed partial class CustomCommandsWindow : Window
             var next = _commands.ToList(); int selected = _editing;
             if (selected >= 0 && selected < next.Count) next[selected] = command; else { selected = next.Count; next.Add(command); }
             CustomCommands.Save(_path, next); _commands = CustomCommands.Load(_path); RefreshList();
-            _loading = true; _list.SelectedIndex = selected; _loading = false;
+            _loading = true; _list.SelectedItem = _commands[selected]; _loading = false;
             ShowCommand(selected); _status.Text = "Команда сохранена.";
         }
         catch (Exception ex) { _status.Text = "Не удалось сохранить: " + ex.Message; }

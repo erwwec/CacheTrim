@@ -92,11 +92,12 @@
                 </StackPanel>
                 <Grid Grid.Row="1">
                     <Grid x:Name="ListView" Visibility="Collapsed">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <Grid Margin="0,0,0,12"><TextBlock Text="Мои команды" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="＋ Новая команда" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Click="New_Click"/></Grid>
-                        <Grid Grid.Row="1"><ListBox x:Name="_list" SelectionChanged="Command_SelectionChanged" AutomationProperties.Name="Мои команды">
+                        <TextBox x:Name="_searchCommands" Grid.Row="1" Tag="Поиск по названию или фразе" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Поиск команд" TextChanged="SearchCommands_Changed"/>
+                        <Grid Grid.Row="2"><ListBox x:Name="_list" SelectionChanged="Command_SelectionChanged" AutomationProperties.Name="Мои команды">
                             <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="15,11"><TextBlock Text="{Binding}" Foreground="#F4F8FA" FontWeight="SemiBold" FontSize="14"/><TextBlock Text="{Binding Phrases[0]}" Foreground="#9EB2BE" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
-                        </ListBox><StackPanel x:Name="EmptyCommands" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock Text="Пока нет своих команд" Foreground="#D9E7ED" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock Text="Создай команду и добавь действия" Foreground="#92A7B3" Margin="0,8,0,0" HorizontalAlignment="Center"/></StackPanel></Grid>
+                        </ListBox><StackPanel x:Name="EmptyCommands" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock x:Name="EmptyTitle" Text="Пока нет своих команд" Foreground="#D9E7ED" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock x:Name="EmptyHint" Text="Создай команду и добавь действия" Foreground="#92A7B3" Margin="0,8,0,0" HorizontalAlignment="Center"/></StackPanel></Grid>
                     </Grid>
                     <ScrollViewer x:Name="EditorView" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,8,12">
