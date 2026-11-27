@@ -21,7 +21,7 @@ static class Program
             if (!File.ReadAllText(cmdFile).Contains("command-ok")) throw new Exception("CMD quoting failed");
             Console.WriteLine("OK: CMD action with quoted path");
             var psFile = Path.Combine(dir, "powershell output.txt");
-            await Run("powershell", "Set-Content -LiteralPath '" + psFile.Replace("'", "''") + "' -Value 'тест ok'");
+            await Run("powershell", "Set-Content -LiteralPath '" + psFile.Replace("'", "''") + "' -Value 'тест ok' -Encoding UTF8");
             if (!File.ReadAllText(psFile).Contains("тест ok")) throw new Exception("PowerShell Unicode or quoting failed");
             Console.WriteLine("OK: PowerShell action with Unicode and quoted path");
             using var cts = new CancellationTokenSource(150);
