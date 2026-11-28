@@ -83,7 +83,7 @@ public partial class MainWindow : Window
         _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         _memoryTimer.Tick += delegate { RefreshMemory(); };
         _memoryTimer.Start();
-        string[] pages = { "memory", "clean", "optimize", "startup", "log", "settings", "advanced", "pet" };
+        string[] pages = { "memory", "clean", "optimize", "startup", "log", "settings", "advanced", "pet", "windows-cleanup" };
         Navigate(pages[Math.Max(0, Math.Min(pages.Length - 1, startPage))]);
         RefreshMemory();
     }
@@ -149,6 +149,7 @@ public partial class MainWindow : Window
         NavigationItems.Children.Clear();
         AddNav("Память", "☷", "memory");
         AddNav("Очистка", "◇", "clean");
+        AddNav("Очистка Windows", "🧹", "windows-cleanup");
         AddNav("Оптимизация", "⚙", "optimize");
         AddNav("Расширенные", "⚡", "advanced");
         AddNav("Питомец", "◆", "pet");
@@ -175,6 +176,7 @@ public partial class MainWindow : Window
             Tag = page
         };
         if (page == "advanced") System.Windows.Automation.AutomationProperties.SetAutomationId(button, "nav-advanced");
+        if (page == "windows-cleanup") System.Windows.Automation.AutomationProperties.SetAutomationId(button, "nav-windows-cleanup");
         button.Click += (_, _) => Navigate(page);
         NavigationItems.Children.Add(button);
         if (page == _activePage) SetNavSelected(button, true);
@@ -191,6 +193,7 @@ public partial class MainWindow : Window
             case "clean": ShowClean(); break;
             case "optimize": ShowOptimize(); break;
             case "advanced": ShowAdvanced(); break;
+            case "windows-cleanup": ShowWindowsCleanup(); break;
             case "pet": ShowPet(); break;
             case "startup": ShowStartup(); break;
             case "log": ShowLog(); break;

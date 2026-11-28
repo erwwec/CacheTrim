@@ -20,6 +20,7 @@ public partial class MainWindow
     [
         ("Память и её очистка", "озу оперативная standby кэш", "memory"),
         ("Очистка файлов", "временные файлы браузеры корзина кэш предпросмотр исключения", "clean"),
+        ("Очистка Windows — внешние инструменты", "Win11Debloat WinUtil Tiny11Builder очистка установка Windows ISO образ", "windows-cleanup"),
         ("Оптимизация Windows", "твики настройки игры производительность", "optimize"),
         ("План питания", "ноутбук высокая производительность", "advanced"),
         ("Проверка Windows и диска", "sfc dism chkdsk восстановление", "advanced"),
