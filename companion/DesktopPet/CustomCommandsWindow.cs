@@ -13,9 +13,7 @@ internal sealed partial class CustomCommandsWindow : Window
 {
     // Templates are inert until the user explicitly saves them as a custom command.
     private static readonly CustomCommand[] Templates = {
-        new("Яндекс", new() { "открой яндекс" }, true, new() { new("url", "https://yandex.ru/") }),
         new("YouTube", new() { "открой ютуб" }, true, new() { new("url", "https://www.youtube.com/") }),
-        new("ВКонтакте", new() { "открой вконтакте" }, true, new() { new("url", "https://vk.com/") }),
         new("Переводчик", new() { "открой переводчик" }, true, new() { new("url", "https://translate.google.com/") }),
         new("Google", new() { "открой гугл" }, true, new() { new("url", "https://www.google.com/") }),
         new("Закрыть окно", new() { "закрой окно" }, true, new() { new("window", "close") }),
@@ -28,6 +26,7 @@ internal sealed partial class CustomCommandsWindow : Window
         new("Отменить ввод", new() { "отмени ввод" }, true, new() { new("keys", "Ctrl+Z") }),
         new("Другое окно", new() { "другое окно" }, true, new() { new("keys", "Alt+Tab") })
     };
+
     private readonly string _path;
     private List<CustomCommand> _commands;
     private int _editing = -1;

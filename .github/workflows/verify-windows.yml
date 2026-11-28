@@ -2,7 +2,7 @@ name: Verify Windows build
 
 on:
   push:
-    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign', 'feat/commands-actions', 'feat/commands-complete', 'fix/commands-menu-design']
+    branches: [main, 'test/claude-v2-voice', 'test/claude-v2-window', 'fix/liquid-glass-wpf', 'fix/update-history-safety', 'feat/safe-cleanup-lyrics', 'feat/offline-pet-progress', 'fix/update-progress-notices', 'feat/system-insights', 'fix/diagnostics-design', 'feat/claude-slider-v2', 'feat/claude-custom-commands', 'feat/commands-redesign', 'feat/commands-actions', 'feat/commands-complete', 'fix/commands-menu-design', 'feat/remove-claude-command-templates']
   pull_request:
     branches: [main]
 
