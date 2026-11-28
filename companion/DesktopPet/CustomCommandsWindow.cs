@@ -11,8 +11,21 @@ namespace DesktopPet;
 
 internal sealed partial class CustomCommandsWindow : Window
 {
-    // No built-in command templates; users can create their own commands.
-    private static readonly CustomCommand[] Templates = Array.Empty<CustomCommand>();
+    // Templates are inert until the user explicitly saves them as a custom command.
+    private static readonly CustomCommand[] Templates = {
+        new("YouTube", new() { "открой ютуб" }, true, new() { new("url", "https://www.youtube.com/") }),
+        new("Переводчик", new() { "открой переводчик" }, true, new() { new("url", "https://translate.google.com/") }),
+        new("Google", new() { "открой гугл" }, true, new() { new("url", "https://www.google.com/") }),
+        new("Закрыть окно", new() { "закрой окно" }, true, new() { new("window", "close") }),
+        new("На весь экран (F11)", new() { "на весь экран" }, true, new() { new("keys", "F11") }),
+        new("Развернуть окно", new() { "разверни окно" }, true, new() { new("window", "maximize") }),
+        new("Нормальное окно", new() { "восстанови окно" }, true, new() { new("window", "restore") }),
+        new("Свернуть окно", new() { "сверни окно" }, true, new() { new("window", "minimize") }),
+        new("Вставить", new() { "вставь" }, true, new() { new("keys", "Ctrl+V") }),
+        new("Скопировать", new() { "скопируй" }, true, new() { new("keys", "Ctrl+C") }),
+        new("Отменить ввод", new() { "отмени ввод" }, true, new() { new("keys", "Ctrl+Z") }),
+        new("Другое окно", new() { "другое окно" }, true, new() { new("keys", "Alt+Tab") })
+    };
 
     private readonly string _path;
     private List<CustomCommand> _commands;
