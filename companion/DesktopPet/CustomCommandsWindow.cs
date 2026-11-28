@@ -14,6 +14,7 @@ internal sealed partial class CustomCommandsWindow : Window
     // No built-in command templates; users can create their own commands.
     private static readonly CustomCommand[] Templates = Array.Empty<CustomCommand>();
 
+    private readonly string _path;
     private List<CustomCommand> _commands;
     private int _editing = -1;
     private bool _loading;
